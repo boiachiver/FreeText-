@@ -22,7 +22,9 @@ export default function Auth({ onAuthenticated }: AuthProps) {
     setError("");
     setMessage("");
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       setError("Please enter your email and password.");
       return;
     }
@@ -35,7 +37,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
     setLoading(true);
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: cleanEmail,
       password,
     });
 
@@ -46,53 +48,75 @@ export default function Auth({ onAuthenticated }: AuthProps) {
       return;
     }
 
-    if (data.user) {
-      setStep("profile");
-      setMessage(
-        "Account created. Now complete your FreeText profile."
-      );
+    if (!data.user) {
+      setError("Account could not be created. Please try again.");
+      return;
     }
+
+    if (!data.session) {
+      setMessage(
+        "Account created successfully. Please check your email to confirm your account, then log in."
+      );
+      setMode("login");
+      return;
+    }
+
+    setStep("profile");
+    setMessage("Account created. Now complete your FreeText profile.");
   };
 
   const saveProfile = async () => {
     setError("");
     setMessage("");
 
-    if (!fullName.trim() || !username.trim()) {
-      setError("Please enter your name and username.");
-      return;
-    }
-
+    const cleanName = fullName.trim();
     const cleanUsername = username
       .trim()
       .replace(/^@/, "")
       .replace(/\s+/g, "")
       .toLowerCase();
 
+    if (!cleanName || !cleanUsername) {
+      setError("Please enter your full name and username.");
+      return;
+    }
+
+    if (cleanUsername.length < 3) {
+      setError("Username must be at least 3 characters.");
+      return;
+    }
+
     setLoading(true);
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
       setLoading(false);
       setError("Your session has expired. Please log in again.");
+      setStep("account");
+      setMode("login");
       return;
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .insert({
-        id: user.id,
-        username: cleanUsername,
-        full_name: fullName.trim(),
-      });
+    const { error } = await supabase.from("profiles").insert({
+      id: user.id,
+      username: cleanUsername,
+      full_name: cleanName,
+    });
 
     setLoading(false);
 
     if (error) {
-      setError(error.message);
+      if (error.code === "23505") {
+        setError(
+          "That username is already taken. Please choose another one."
+        );
+      } else {
+        setError(error.message);
+      }
       return;
     }
 
@@ -103,16 +127,18 @@ export default function Auth({ onAuthenticated }: AuthProps) {
     setError("");
     setMessage("");
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       setError("Please enter your email and password.");
       return;
     }
 
     setLoading(true);
 
-    const { error } =
+    const { data, error } =
       await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
@@ -123,7 +149,19 @@ export default function Auth({ onAuthenticated }: AuthProps) {
       return;
     }
 
+    if (!data.user) {
+      setError("Login failed. Please try again.");
+      return;
+    }
+
     onAuthenticated();
+  };
+
+  const switchMode = () => {
+    setMode(mode === "signup" ? "login" : "signup");
+    setError("");
+    setMessage("");
+    setStep("account");
   };
 
   if (step === "profile") {
@@ -188,7 +226,6 @@ export default function Auth({ onAuthenticated }: AuthProps) {
 
   return (
     <div className="auth-page">
-
       <div className="auth-card">
 
         <div className="auth-logo">
@@ -235,11 +272,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
 
         <button
           className="auth-primary-button"
-          onClick={
-            mode === "signup"
-              ? signup
-              : login
-          }
+          onClick={mode === "signup" ? signup : login}
           disabled={loading}
         >
           {loading
@@ -257,7 +290,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
           className="auth-phone-button"
           onClick={() =>
             setMessage(
-              "Phone signup will be enabled after SMS verification is configured."
+              "Phone signup will be available after SMS/WhatsApp verification is configured."
             )
           }
         >
@@ -266,15 +299,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
 
         <button
           className="auth-switch"
-          onClick={() => {
-            setMode(
-              mode === "signup"
-                ? "login"
-                : "signup"
-            );
-            setError("");
-            setMessage("");
-          }}
+          onClick={switchMode}
         >
           {mode === "signup"
             ? "Already have an account? Log in"
@@ -282,7 +307,6 @@ export default function Auth({ onAuthenticated }: AuthProps) {
         </button>
 
       </div>
-
     </div>
   );
 }
