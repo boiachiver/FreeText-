@@ -14,6 +14,12 @@ import { supabase } from "../lib/supabase";
 type AuthMode = "login" | "signup";
 type AuthStep = 1 | 2 | 3;
 
+const PENDING_VERIFICATION_KEY =
+  "freetext_pending_verification_email";
+
+const VERIFICATION_REDIRECT =
+  "https://freetext-app.vercel.app/?verified=1";
+
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [step, setStep] = useState<AuthStep>(1);
@@ -42,8 +48,46 @@ export default function Auth() {
         data: { session },
       } = await supabase.auth.getSession();
 
+      const verifiedRedirect =
+        new URLSearchParams(window.location.search).get(
+          "verified"
+        ) === "1";
+
+      const pendingEmail = localStorage.getItem(
+        PENDING_VERIFICATION_KEY
+      );
+
+      if (pendingEmail) {
+        setEmail(pendingEmail);
+      }
+
+      if (verifiedRedirect) {
+        if (session?.user?.email_confirmed_at) {
+          localStorage.removeItem(
+            PENDING_VERIFICATION_KEY
+          );
+
+          setMessage(
+            "Your email has been verified successfully."
+          );
+          setStep(3);
+        } else {
+          setStep(2);
+        }
+
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+
+        return;
+      }
+
       if (session?.user?.email_confirmed_at) {
         setStep(3);
+      } else if (pendingEmail) {
+        setStep(2);
       }
     };
 
@@ -57,6 +101,10 @@ export default function Auth() {
           event === "SIGNED_IN" &&
           session?.user?.email_confirmed_at
         ) {
+          localStorage.removeItem(
+            PENDING_VERIFICATION_KEY
+          );
+
           setMessage(
             "Your email has been verified successfully."
           );
@@ -110,6 +158,11 @@ export default function Auth() {
           .toLowerCase()
           .includes("email not confirmed")
       ) {
+        localStorage.setItem(
+          PENDING_VERIFICATION_KEY,
+          email.trim().toLowerCase()
+        );
+
         setError(
           "Please verify your email before logging in."
         );
@@ -122,6 +175,10 @@ export default function Auth() {
     }
 
     if (data.session) {
+      localStorage.removeItem(
+        PENDING_VERIFICATION_KEY
+      );
+
       setMessage("Welcome back to FreeText!");
     }
   };
@@ -165,6 +222,9 @@ export default function Auth() {
       await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          emailRedirectTo: VERIFICATION_REDIRECT,
+        },
       });
 
     setLoading(false);
@@ -175,11 +235,20 @@ export default function Auth() {
     }
 
     if (data.session) {
+      localStorage.removeItem(
+        PENDING_VERIFICATION_KEY
+      );
+
       setMessage(
         "Account created successfully."
       );
       setStep(3);
     } else {
+      localStorage.setItem(
+        PENDING_VERIFICATION_KEY,
+        email.trim().toLowerCase()
+      );
+
       setMessage(
         "We've sent a FreeText verification email to your inbox."
       );
@@ -193,17 +262,29 @@ export default function Auth() {
 
     if (resendSeconds > 0) return;
 
-    if (!email.trim()) {
+    const savedEmail = localStorage.getItem(
+      PENDING_VERIFICATION_KEY
+    );
+
+    const verificationEmail =
+      email.trim() || savedEmail || "";
+
+    if (!verificationEmail) {
       setError("Please enter your email address.");
       return;
     }
+
+    setEmail(verificationEmail);
 
     setLoading(true);
 
     const { error: resendError } =
       await supabase.auth.resend({
         type: "signup",
-        email: email.trim(),
+        email: verificationEmail,
+        options: {
+          emailRedirectTo: VERIFICATION_REDIRECT,
+        },
       });
 
     setLoading(false);
@@ -212,6 +293,11 @@ export default function Auth() {
       setError(resendError.message);
       return;
     }
+
+    localStorage.setItem(
+      PENDING_VERIFICATION_KEY,
+      verificationEmail.toLowerCase()
+    );
 
     setMessage(
       "A new FreeText verification email has been sent."
@@ -243,6 +329,10 @@ export default function Auth() {
       );
       return;
     }
+
+    localStorage.removeItem(
+      PENDING_VERIFICATION_KEY
+    );
 
     setMessage(
       "Email verified successfully! Welcome to FreeText."
@@ -322,6 +412,10 @@ export default function Auth() {
       return;
     }
 
+    localStorage.removeItem(
+      PENDING_VERIFICATION_KEY
+    );
+
     setMessage(
       "Your FreeText profile is ready!"
     );
@@ -368,8 +462,9 @@ export default function Auth() {
           </strong>
 
           <p className="auth-helper">
-            Open the email and tap the FreeText
-            verification link to confirm your account.
+            Open your email and tap the FreeText
+            verification link. Then come back here and
+            tap "I have verified my email".
           </p>
 
           {error && (
@@ -393,7 +488,7 @@ export default function Auth() {
           >
             {loading
               ? "Checking..."
-              : "I've verified my email"}
+              : "I have verified my email"}
           </button>
 
           <button
