@@ -663,15 +663,9 @@ function App() {
     );
   }
 
-  if (!session) {
-    return (
-      <Auth
-        onAuthenticated={() => {
-          setPage("home");
-        }}
-      />
-    );
-  }
+ if (!session) {
+  return <Auth />;
+ } 
 
   return (
     <div
