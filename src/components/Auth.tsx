@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -13,25 +13,40 @@ import {
 import { supabase } from "../lib/supabase";
 
 type AuthMode = "login" | "signup";
+type AuthStep = 1 | 2 | 3;
 
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>("signup");
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<AuthStep>(1);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [code, setCode] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [resendSeconds, setResendSeconds] = useState(0);
 
   const clearMessages = () => {
     setMessage("");
     setError("");
   };
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResendSeconds((current) =>
+        current > 0 ? current - 1 : 0
+      );
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
 
   const switchMode = (nextMode: AuthMode) => {
     if (loading) return;
@@ -39,6 +54,15 @@ export default function Auth() {
     clearMessages();
     setMode(nextMode);
     setStep(1);
+    setCode("");
+    setResendSeconds(0);
+  };
+
+  const startVerification = () => {
+    clearMessages();
+    setCode("");
+    setResendSeconds(120);
+    setStep(2);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -68,7 +92,24 @@ export default function Auth() {
             password,
           });
 
-        if (loginError) throw loginError;
+        if (loginError) {
+          const needsVerification =
+            loginError.message
+              .toLowerCase()
+              .includes("email not confirmed");
+
+          if (needsVerification) {
+            setCode("");
+            setResendSeconds(120);
+            setStep(2);
+            setMessage(
+              "Please verify your email with the 6-digit code we sent you."
+            );
+            return;
+          }
+
+          throw loginError;
+        }
 
         if (!data.session || !data.user) {
           throw new Error(
@@ -88,7 +129,7 @@ export default function Auth() {
         }
 
         if (!existingProfile) {
-          setStep(2);
+          setStep(3);
           setMessage(
             "Welcome back. Complete your FreeText profile to continue."
           );
@@ -111,19 +152,15 @@ export default function Auth() {
         throw new Error("We could not create your account.");
       }
 
-      if (!data.session) {
-        setMode("login");
-        setStep(1);
+      if (data.session) {
+        setStep(3);
         setMessage(
-          "Account created successfully. Please check your email and confirm your account, then log in to complete your FreeText profile."
+          "Your account has been created. Complete your profile below."
         );
         return;
       }
 
-      setStep(2);
-      setMessage(
-        "Your account has been created. Complete your profile below."
-      );
+      startVerification();
     } catch (err) {
       setError(
         err instanceof Error
@@ -135,7 +172,91 @@ export default function Auth() {
     }
   };
 
-  const completeProfile = async (event: React.FormEvent) => {
+  const verifyEmailCode = async (
+    event: React.FormEvent
+  ) => {
+    event.preventDefault();
+
+    if (loading) return;
+
+    clearMessages();
+
+    const cleanCode = code.replace(/\D/g, "");
+
+    if (cleanCode.length !== 6) {
+      setError("Please enter the 6-digit verification code.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error: verifyError } =
+        await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: cleanCode,
+          type: "signup",
+        });
+
+      if (verifyError) throw verifyError;
+
+      if (!data.user || !data.session) {
+        throw new Error(
+          "Verification succeeded, but we could not start your session. Please log in again."
+        );
+      }
+
+      setStep(3);
+      setCode("");
+      setMessage(
+        "Email verified successfully. Now complete your FreeText profile."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Invalid verification code. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (loading || resendSeconds > 0) return;
+
+    clearMessages();
+    setLoading(true);
+
+    try {
+      const { error: resendError } =
+        await supabase.auth.resend({
+          type: "signup",
+          email: email.trim(),
+        });
+
+      if (resendError) throw resendError;
+
+      setCode("");
+      setResendSeconds(120);
+
+      setMessage(
+        "A new 6-digit verification code has been sent to your email."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "We could not resend the verification code."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeProfile = async (
+    event: React.FormEvent
+  ) => {
     event.preventDefault();
 
     if (loading) return;
@@ -192,9 +313,8 @@ export default function Auth() {
         );
       }
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert(
+      const { error: profileError } =
+        await supabase.from("profiles").upsert(
           {
             id: user.id,
             username: cleanUsername,
@@ -222,6 +342,154 @@ export default function Auth() {
   };
 
   if (step === 2) {
+    return (
+      <main className="auth-page">
+        <div className="auth-glow auth-glow-one" />
+        <div className="auth-glow auth-glow-two" />
+
+        <section className="auth-card auth-profile-card">
+          <div className="auth-brand">
+            <div className="auth-logo">F</div>
+            <span>FreeText</span>
+          </div>
+
+          <div className="auth-welcome-icon">
+            <Mail size={30} />
+          </div>
+
+          <h1 className="auth-heading">
+            Verify your email
+          </h1>
+
+          <p className="auth-subheading">
+            We sent a 6-digit verification code to{" "}
+            <strong>{email}</strong>. You can also use
+            the confirmation link in the email.
+          </p>
+
+          {error && (
+            <div className="auth-message auth-error">
+              {error}
+            </div>
+          )}
+
+          {message && !error && (
+            <div className="auth-message auth-success">
+              <CheckCircle2 size={17} />
+              {message}
+            </div>
+          )}
+
+          <form
+            className="auth-form"
+            onSubmit={verifyEmailCode}
+          >
+            <label className="auth-field">
+              <span>6-digit verification code</span>
+
+              <div className="auth-input-wrap">
+                <Mail size={18} />
+
+                <input
+                  className="auth-input"
+                  value={code}
+                  onChange={(e) =>
+                    setCode(
+                      e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 6)
+                    )
+                  }
+                  placeholder="123456"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            </label>
+
+            <button
+              className="auth-primary-button"
+              type="submit"
+              disabled={loading || code.length !== 6}
+            >
+              {loading ? (
+                <>
+                  <Loader2
+                    className="auth-spinner"
+                    size={19}
+                  />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Verify email
+                  <ArrowRight size={19} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: "16px",
+            }}
+          >
+            {resendSeconds > 0 ? (
+              <p className="auth-helper">
+                Resend code in{" "}
+                <strong>
+                  {Math.floor(resendSeconds / 60)}:
+                  {String(resendSeconds % 60).padStart(
+                    2,
+                    "0"
+                  )}
+                </strong>
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="auth-footer"
+                onClick={resendCode}
+                disabled={loading}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                Didn't receive the code?{" "}
+                <strong>Resend code</strong>
+              </button>
+            )}
+          </div>
+
+          <p
+            className="auth-helper"
+            style={{
+              textAlign: "center",
+              marginTop: "14px",
+            }}
+          >
+            You can also confirm your account using
+            the link inside the email.
+          </p>
+
+          <div className="auth-progress">
+            <span className="active" />
+            <span className="active" />
+            <span />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (step === 3) {
     return (
       <main className="auth-page">
         <div className="auth-glow auth-glow-one" />
@@ -284,7 +552,9 @@ export default function Auth() {
               <span>Username</span>
 
               <div className="auth-input-wrap">
-                <span className="username-symbol">@</span>
+                <span className="username-symbol">
+                  @
+                </span>
 
                 <input
                   className="auth-input"
@@ -321,6 +591,7 @@ export default function Auth() {
           </form>
 
           <div className="auth-progress">
+            <span className="active" />
             <span className="active" />
             <span className="active" />
           </div>
