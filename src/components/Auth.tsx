@@ -62,13 +62,38 @@ export default function Auth() {
 
     try {
       if (mode === "login") {
-        const { error: loginError } =
+        const { data, error: loginError } =
           await supabase.auth.signInWithPassword({
             email: email.trim(),
             password,
           });
 
         if (loginError) throw loginError;
+
+        if (!data.session || !data.user) {
+          throw new Error(
+            "We could not start your session. Please try again."
+          );
+        }
+
+        const { data: existingProfile, error: profileCheckError } =
+          await supabase
+            .from("profiles")
+            .select("id, username, full_name")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
+        if (profileCheckError) {
+          throw profileCheckError;
+        }
+
+        if (!existingProfile) {
+          setStep(2);
+          setMessage(
+            "Welcome back. Complete your FreeText profile to continue."
+          );
+          return;
+        }
 
         setMessage("Welcome back to FreeText.");
         return;
@@ -84,6 +109,15 @@ export default function Auth() {
 
       if (!data.user) {
         throw new Error("We could not create your account.");
+      }
+
+      if (!data.session) {
+        setMode("login");
+        setStep(1);
+        setMessage(
+          "Account created successfully. Please check your email and confirm your account, then log in to complete your FreeText profile."
+        );
+        return;
       }
 
       setStep(2);
@@ -127,24 +161,55 @@ export default function Auth() {
 
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!user) {
-        throw new Error("Your session has expired. Please sign in again.");
+      if (!session?.user) {
+        throw new Error(
+          "Your session has expired. Please log in again."
+        );
+      }
+
+      const user = session.user;
+
+      const { data: existingUsername, error: usernameCheckError } =
+        await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", cleanUsername)
+          .maybeSingle();
+
+      if (usernameCheckError) {
+        throw usernameCheckError;
+      }
+
+      if (
+        existingUsername &&
+        existingUsername.id !== user.id
+      ) {
+        throw new Error(
+          "That username is already taken. Please choose another one."
+        );
       }
 
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
-          id: user.id,
-          username: cleanUsername,
-          full_name: cleanName,
-        });
+        .upsert(
+          {
+            id: user.id,
+            username: cleanUsername,
+            full_name: cleanName,
+          },
+          {
+            onConflict: "id",
+          }
+        );
 
       if (profileError) throw profileError;
 
-      setMessage("Profile created successfully. Welcome to FreeText!");
+      setMessage(
+        "Profile created successfully. Welcome to FreeText!"
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -172,7 +237,9 @@ export default function Auth() {
             <CheckCircle2 size={30} />
           </div>
 
-          <h1 className="auth-heading">Complete your profile</h1>
+          <h1 className="auth-heading">
+            Complete your profile
+          </h1>
 
           <p className="auth-subheading">
             One last step and your FreeText account is ready.
@@ -191,15 +258,22 @@ export default function Auth() {
             </div>
           )}
 
-          <form className="auth-form" onSubmit={completeProfile}>
+          <form
+            className="auth-form"
+            onSubmit={completeProfile}
+          >
             <label className="auth-field">
               <span>Full name</span>
+
               <div className="auth-input-wrap">
                 <User size={18} />
+
                 <input
                   className="auth-input"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) =>
+                    setFullName(e.target.value)
+                  }
                   placeholder="Your full name"
                   disabled={loading}
                 />
@@ -208,12 +282,16 @@ export default function Auth() {
 
             <label className="auth-field">
               <span>Username</span>
+
               <div className="auth-input-wrap">
                 <span className="username-symbol">@</span>
+
                 <input
                   className="auth-input"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) =>
+                    setUsername(e.target.value)
+                  }
                   placeholder="yourusername"
                   disabled={loading}
                 />
@@ -227,7 +305,10 @@ export default function Auth() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="auth-spinner" size={19} />
+                  <Loader2
+                    className="auth-spinner"
+                    size={19}
+                  />
                   Creating profile...
                 </>
               ) : (
@@ -304,7 +385,10 @@ export default function Auth() {
           </div>
         )}
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form
+          className="auth-form"
+          onSubmit={handleSubmit}
+        >
           <label className="auth-field">
             <span>Email address</span>
 
@@ -315,7 +399,9 @@ export default function Auth() {
                 className="auth-input"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
                 placeholder="you@example.com"
                 autoComplete="email"
                 disabled={loading}
@@ -331,9 +417,13 @@ export default function Auth() {
 
               <input
                 className="auth-input"
-                type={showPassword ? "text" : "password"}
+                type={
+                  showPassword ? "text" : "password"
+                }
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
                 placeholder="Enter your password"
                 autoComplete={
                   mode === "login"
@@ -346,7 +436,11 @@ export default function Auth() {
               <button
                 className="password-toggle"
                 type="button"
-                onClick={() => setShowPassword((value) => !value)}
+                onClick={() =>
+                  setShowPassword(
+                    (value) => !value
+                  )
+                }
                 disabled={loading}
                 aria-label={
                   showPassword
@@ -365,7 +459,8 @@ export default function Auth() {
 
           {mode === "signup" && (
             <p className="auth-helper">
-              Use at least 6 characters. Choose something only you know.
+              Use at least 6 characters. Choose
+              something only you know.
             </p>
           )}
 
@@ -376,7 +471,10 @@ export default function Auth() {
           >
             {loading ? (
               <>
-                <Loader2 className="auth-spinner" size={19} />
+                <Loader2
+                  className="auth-spinner"
+                  size={19}
+                />
                 {mode === "signup"
                   ? "Creating account..."
                   : "Signing in..."}
@@ -412,8 +510,8 @@ export default function Auth() {
 
         {mode === "signup" && (
           <p className="auth-terms">
-            By creating an account, you agree to use FreeText
-            respectfully and responsibly.
+            By creating an account, you agree to use
+            FreeText respectfully and responsibly.
           </p>
         )}
 
@@ -424,11 +522,17 @@ export default function Auth() {
           <button
             type="button"
             onClick={() =>
-              switchMode(mode === "signup" ? "login" : "signup")
+              switchMode(
+                mode === "signup"
+                  ? "login"
+                  : "signup"
+              )
             }
             disabled={loading}
           >
-            {mode === "signup" ? "Log in" : "Create account"}
+            {mode === "signup"
+              ? "Log in"
+              : "Create account"}
           </button>
         </p>
       </section>
