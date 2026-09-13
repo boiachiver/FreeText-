@@ -333,13 +333,37 @@ function App() {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      const { error } =
+        await supabase.auth.signOut();
 
-    setActiveChat(null);
-    setShowCreatePost(false);
-    setShowEditProfile(false);
-    setShowNotifications(false);
-    setPage("home");
+      if (error) {
+        console.error(
+          "Logout error:",
+          error
+        );
+        alert(
+          "Unable to log out. Please try again."
+        );
+        return;
+      }
+
+      setSession(null);
+      setActiveChat(null);
+      setShowCreatePost(false);
+      setShowEditProfile(false);
+      setShowNotifications(false);
+      setPage("home");
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error
+      );
+
+      alert(
+        "Something went wrong while logging out."
+      );
+    }
   };
 
   const likePost = (id: string) => {
@@ -374,7 +398,8 @@ function App() {
   const handleImageChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
@@ -397,7 +422,10 @@ function App() {
   };
 
   const publishPost = () => {
-    if (!newCaption.trim() && !newPostImage) {
+    if (
+      !newCaption.trim() &&
+      !newPostImage
+    ) {
       alert(
         "Write something or add a photo."
       );
@@ -434,7 +462,8 @@ function App() {
   const changeCover = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
@@ -459,7 +488,8 @@ function App() {
   const changeProfileAvatar = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
@@ -500,7 +530,8 @@ function App() {
         .replace(/\s+/g, "")
         .toLowerCase() || username;
 
-    const cleanBio = editBio.trim();
+    const cleanBio =
+      editBio.trim();
 
     if (!cleanName || !cleanUsername) {
       alert(
@@ -563,17 +594,19 @@ function App() {
   const sendMessage = (text: string) => {
     if (!activeChat) return;
 
-    const key = activeChat.username;
+    const key =
+      activeChat.username;
 
     const now = new Date();
 
-    const time = now.toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
+    const time =
+      now.toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      );
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -591,10 +624,12 @@ function App() {
     }));
   };
 
-  const conversations = suggestions.map(
-    (person) => {
+  const conversations =
+    suggestions.map((person) => {
       const messages =
-        chatMessages[person.username] || [];
+        chatMessages[
+          person.username
+        ] || [];
 
       const lastMessage =
         messages[messages.length - 1];
@@ -608,8 +643,7 @@ function App() {
         unread: 0,
         online: true,
       };
-    }
-  );
+    });
 
   if (authLoading) {
     return (
@@ -651,13 +685,16 @@ function App() {
         search={search}
         setSearch={setSearch}
         darkMode={darkMode}
-        toggleDarkMode={toggleDarkMode}
+        toggleDarkMode={
+          toggleDarkMode
+        }
         openCreate={openCreate}
         openNotifications={
           openNotifications
         }
         openProfile={openProfile}
         profileAvatar={profileAvatar}
+        logout={logout}
       />
 
       <div className="app-layout">
@@ -711,7 +748,9 @@ function App() {
 
           <button
             className="nav-item"
-            onClick={openNotifications}
+            onClick={
+              openNotifications
+            }
           >
             <Bell size={20} />
             Notifications
@@ -746,7 +785,9 @@ function App() {
           {page === "home" && (
             <>
               <Stories
-                suggestions={suggestions}
+                suggestions={
+                  suggestions
+                }
                 onCreateStory={() =>
                   alert(
                     "Story creation will be added next."
@@ -772,13 +813,19 @@ function App() {
               userName={userName}
               username={username}
               bio={bio}
-              profileAvatar={profileAvatar}
+              profileAvatar={
+                profileAvatar
+              }
               coverPhoto={coverPhoto}
-              postsCount={posts.length}
+              postsCount={
+                posts.length
+              }
               onEditProfile={
                 openEditProfile
               }
-              onChangeCover={changeCover}
+              onChangeCover={
+                changeCover
+              }
             />
           )}
 
@@ -791,8 +838,8 @@ function App() {
                   <h1>Explore</h1>
 
                   <p>
-                    Discover people and posts
-                    on FreeText.
+                    Discover people and
+                    posts on FreeText.
                   </p>
                 </div>
 
@@ -815,8 +862,12 @@ function App() {
           {page === "messages" &&
             !activeChat && (
               <Messages
-                people={conversations}
-                onOpenChat={openChat}
+                people={
+                  conversations
+                }
+                onOpenChat={
+                  openChat
+                }
               />
             )}
 
@@ -832,7 +883,9 @@ function App() {
                 onSendMessage={
                   sendMessage
                 }
-                onBack={backToMessages}
+                onBack={
+                  backToMessages
+                }
               />
             )}
 
@@ -842,7 +895,9 @@ function App() {
       {showCreatePost && (
         <CreatePost
           userName={userName}
-          profileAvatar={profileAvatar}
+          profileAvatar={
+            profileAvatar
+          }
           caption={newCaption}
           image={newPostImage}
           onCaptionChange={
@@ -854,7 +909,9 @@ function App() {
           onRemoveImage={() =>
             setNewPostImage("")
           }
-          onPublish={publishPost}
+          onPublish={
+            publishPost
+          }
           onClose={() =>
             setShowCreatePost(false)
           }
@@ -864,14 +921,20 @@ function App() {
       {showEditProfile && (
         <EditProfile
           editName={editName}
-          editUsername={editUsername}
+          editUsername={
+            editUsername
+          }
           editBio={editBio}
           editAvatar={editAvatar}
-          onNameChange={setEditName}
+          onNameChange={
+            setEditName
+          }
           onUsernameChange={
             setEditUsername
           }
-          onBioChange={setEditBio}
+          onBioChange={
+            setEditBio
+          }
           onAvatarChange={
             changeProfileAvatar
           }
@@ -886,7 +949,9 @@ function App() {
         <div
           className="modal-backdrop"
           onClick={() =>
-            setShowNotifications(false)
+            setShowNotifications(
+              false
+            )
           }
         >
           <div
@@ -897,7 +962,9 @@ function App() {
           >
             <div className="modal-header">
 
-              <h2>Notifications</h2>
+              <h2>
+                Notifications
+              </h2>
 
               <button
                 onClick={() =>
@@ -952,7 +1019,9 @@ function App() {
           <span>Messages</span>
         </button>
 
-        <button onClick={openProfile}>
+        <button
+          onClick={openProfile}
+        >
           <User size={20} />
           <span>Profile</span>
         </button>
