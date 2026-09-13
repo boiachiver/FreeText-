@@ -1743,3 +1743,17 @@ html.dark .auth-success {
   border-color: #24533e;
   background: #14251d;
 }
+.logout-button {
+  position: relative;
+  z-index: 20;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.logout-button:hover {
+  transform: translateY(-1px);
+}
+
+.logout-button:active {
+  transform: scale(0.95);
+}
