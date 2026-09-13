@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  MessageCircle,
+  User,
+} from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type AuthProps = {
@@ -14,6 +24,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -55,14 +66,14 @@ export default function Auth({ onAuthenticated }: AuthProps) {
 
     if (!data.session) {
       setMessage(
-        "Account created successfully. Please check your email to confirm your account, then log in."
+        "Your account is ready. Check your email to confirm your FreeText account."
       );
       setMode("login");
       return;
     }
 
     setStep("profile");
-    setMessage("Account created. Now complete your FreeText profile.");
+    setMessage("Account created. Let's finish your profile.");
   };
 
   const saveProfile = async () => {
@@ -111,9 +122,7 @@ export default function Auth({ onAuthenticated }: AuthProps) {
 
     if (error) {
       if (error.code === "23505") {
-        setError(
-          "That username is already taken. Please choose another one."
-        );
+        setError("That username is already taken.");
       } else {
         setError(error.message);
       }
@@ -167,21 +176,40 @@ export default function Auth({ onAuthenticated }: AuthProps) {
   if (step === "profile") {
     return (
       <div className="auth-page">
-        <div className="auth-card">
+        <div className="auth-glow auth-glow-one" />
+        <div className="auth-glow auth-glow-two" />
 
-          <div className="auth-logo">
-            💬
+        <div className="auth-card auth-profile-card">
+          <div className="auth-brand">
+            <div className="auth-logo">
+              <MessageCircle size={24} />
+            </div>
+
+            <span>FreeText</span>
           </div>
 
-          <h1>Welcome to FreeText</h1>
+          <div className="auth-progress">
+            <span className="active" />
+            <span className="active" />
+          </div>
 
-          <p className="auth-subtitle">
-            Complete your profile to get started.
-          </p>
+          <div className="auth-heading">
+            <div className="auth-welcome-icon">
+              <User size={24} />
+            </div>
+
+            <h1>Complete your profile</h1>
+
+            <p>
+              Tell people a little about yourself and choose
+              your FreeText username.
+            </p>
+          </div>
 
           {message && (
             <div className="auth-message">
-              {message}
+              <CheckCircle2 size={18} />
+              <span>{message}</span>
             </div>
           )}
 
@@ -191,58 +219,113 @@ export default function Auth({ onAuthenticated }: AuthProps) {
             </div>
           )}
 
-          <input
-            type="text"
-            placeholder="Full name"
-            value={fullName}
-            onChange={(event) =>
-              setFullName(event.target.value)
-            }
-          />
+          <div className="auth-form">
+            <label>Full name</label>
 
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(event) =>
-              setUsername(event.target.value)
-            }
-          />
+            <div className="auth-input">
+              <User size={18} />
 
-          <button
-            className="auth-primary-button"
-            onClick={saveProfile}
-            disabled={loading}
-          >
-            {loading
-              ? "Creating profile..."
-              : "Complete account"}
-          </button>
+              <input
+                type="text"
+                placeholder="Your full name"
+                value={fullName}
+                onChange={(event) =>
+                  setFullName(event.target.value)
+                }
+              />
+            </div>
 
+            <label>Username</label>
+
+            <div className="auth-input">
+              <span className="username-symbol">@</span>
+
+              <input
+                type="text"
+                placeholder="username"
+                value={username}
+                onChange={(event) =>
+                  setUsername(event.target.value)
+                }
+              />
+            </div>
+
+            <p className="auth-helper">
+              Your username must be at least 3 characters.
+            </p>
+
+            <button
+              className="auth-primary-button"
+              onClick={saveProfile}
+              disabled={loading}
+            >
+              {loading ? "Creating profile..." : "Finish setup"}
+              {!loading && <ArrowRight size={19} />}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  const isSignup = mode === "signup";
+
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <div className="auth-glow auth-glow-one" />
+      <div className="auth-glow auth-glow-two" />
 
-        <div className="auth-logo">
-          💬
+      <div className="auth-card">
+        <div className="auth-brand">
+          <div className="auth-logo">
+            <MessageCircle size={24} />
+          </div>
+
+          <span>FreeText</span>
         </div>
 
-        <h1>FreeText</h1>
+        <div className="auth-heading">
+          <h1>
+            {isSignup
+              ? "Join the conversation"
+              : "Welcome back"}
+          </h1>
 
-        <p className="auth-subtitle">
-          {mode === "signup"
-            ? "Create your account and connect with people."
-            : "Log in to your FreeText account."}
-        </p>
+          <p>
+            {isSignup
+              ? "Create your account and connect with people who matter."
+              : "Log in and continue where you left off."}
+          </p>
+        </div>
+
+        <div className="auth-mode-switch">
+          <button
+            className={isSignup ? "active" : ""}
+            onClick={() => {
+              setMode("signup");
+              setError("");
+              setMessage("");
+            }}
+          >
+            Create account
+          </button>
+
+          <button
+            className={!isSignup ? "active" : ""}
+            onClick={() => {
+              setMode("login");
+              setError("");
+              setMessage("");
+            }}
+          >
+            Log in
+          </button>
+        </div>
 
         {message && (
           <div className="auth-message">
-            {message}
+            <CheckCircle2 size={18} />
+            <span>{message}</span>
           </div>
         )}
 
@@ -252,35 +335,84 @@ export default function Auth({ onAuthenticated }: AuthProps) {
           </div>
         )}
 
-        <input
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(event) =>
-            setEmail(event.target.value)
-          }
-        />
+        <div className="auth-form">
+          <label>Email address</label>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(event) =>
-            setPassword(event.target.value)
-          }
-        />
+          <div className="auth-input">
+            <Mail size={18} />
 
-        <button
-          className="auth-primary-button"
-          onClick={mode === "signup" ? signup : login}
-          disabled={loading}
-        >
-          {loading
-            ? "Please wait..."
-            : mode === "signup"
-            ? "Create new account"
-            : "Log in"}
-        </button>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              autoComplete="email"
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
+            />
+          </div>
+
+          <label>Password</label>
+
+          <div className="auth-input">
+            <LockKeyhole size={18} />
+
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder={
+                isSignup
+                  ? "Create a password"
+                  : "Enter your password"
+              }
+              value={password}
+              autoComplete={
+                isSignup ? "new-password" : "current-password"
+              }
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
+            />
+
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() =>
+                setShowPassword((current) => !current)
+              }
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
+            >
+              {showPassword ? (
+                <EyeOff size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </button>
+          </div>
+
+          {isSignup && (
+            <p className="auth-helper">
+              Use at least 6 characters for your password.
+            </p>
+          )}
+
+          <button
+            className="auth-primary-button"
+            onClick={isSignup ? signup : login}
+            disabled={loading}
+          >
+            {loading
+              ? "Please wait..."
+              : isSignup
+              ? "Create my account"
+              : "Log in"}
+
+            {!loading && <ArrowRight size={19} />}
+          </button>
+        </div>
 
         <div className="auth-divider">
           <span>OR</span>
@@ -294,18 +426,24 @@ export default function Auth({ onAuthenticated }: AuthProps) {
             )
           }
         >
-          📱 Continue with phone number
+          <MessageCircle size={19} />
+          Continue with phone number
         </button>
 
-        <button
-          className="auth-switch"
-          onClick={switchMode}
-        >
-          {mode === "signup"
-            ? "Already have an account? Log in"
-            : "Don't have an account? Create one"}
-        </button>
+        <p className="auth-terms">
+          By continuing, you agree to use FreeText responsibly
+          and respectfully.
+        </p>
 
+        <div className="auth-footer">
+          {isSignup
+            ? "Already have a FreeText account?"
+            : "Don't have a FreeText account?"}
+
+          <button onClick={switchMode}>
+            {isSignup ? "Log in" : "Create account"}
+          </button>
+        </div>
       </div>
     </div>
   );
