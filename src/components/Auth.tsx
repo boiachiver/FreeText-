@@ -1,4 +1,14 @@
 import { useEffect, useState } from "react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  AtSign,
+  CheckCircle2,
+  ArrowLeft,
+} from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type AuthMode = "login" | "signup";
@@ -13,11 +23,18 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const [resendSeconds, setResendSeconds] = useState(0);
+
+  const clearMessages = () => {
+    setError("");
+    setMessage("");
+  };
 
   useEffect(() => {
     const checkSession = async () => {
@@ -25,13 +42,8 @@ export default function Auth() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        const confirmed =
-          session.user.email_confirmed_at;
-
-        if (confirmed) {
-          setStep(3);
-        }
+      if (session?.user?.email_confirmed_at) {
+        setStep(3);
       }
     };
 
@@ -46,7 +58,7 @@ export default function Auth() {
           session?.user?.email_confirmed_at
         ) {
           setMessage(
-            "Email verified successfully! Welcome to FreeText."
+            "Your email has been verified successfully."
           );
           setStep(3);
         }
@@ -67,19 +79,18 @@ export default function Auth() {
       );
     }, 1000);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [resendSeconds]);
-
-  const clearMessages = () => {
-    setError("");
-    setMessage("");
-  };
 
   const handleLogin = async () => {
     clearMessages();
 
-    if (!email || !password) {
-      setError("Please enter your email and password.");
+    if (!email.trim() || !password) {
+      setError(
+        "Please enter your email and password."
+      );
       return;
     }
 
@@ -118,14 +129,32 @@ export default function Auth() {
   const handleSignup = async () => {
     clearMessages();
 
-    if (!email || !password || !fullName || !username) {
+    if (
+      !email.trim() ||
+      !password ||
+      !fullName.trim() ||
+      !username.trim()
+    ) {
       setError("Please complete all fields.");
       return;
     }
 
     if (password.length < 6) {
       setError(
-        "Password must be at least 6 characters."
+        "Your password must be at least 6 characters."
+      );
+      return;
+    }
+
+    const cleanUsername = username
+      .trim()
+      .replace(/^@/, "")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+
+    if (cleanUsername.length < 3) {
+      setError(
+        "Username must be at least 3 characters."
       );
       return;
     }
@@ -147,12 +176,12 @@ export default function Auth() {
 
     if (data.session) {
       setMessage(
-        "Account created successfully. Complete your profile."
+        "Account created successfully."
       );
       setStep(3);
     } else {
       setMessage(
-        "Account created! Check your email and click the FreeText verification link."
+        "We've sent a FreeText verification email to your inbox."
       );
       setStep(2);
       setResendSeconds(120);
@@ -164,7 +193,7 @@ export default function Auth() {
 
     if (resendSeconds > 0) return;
 
-    if (!email) {
+    if (!email.trim()) {
       setError("Please enter your email address.");
       return;
     }
@@ -203,14 +232,14 @@ export default function Auth() {
 
     if (!session?.user) {
       setError(
-        "Your email is not verified yet. Please click the verification link in your email."
+        "Your email has not been verified yet. Please open the FreeText verification email and click the link."
       );
       return;
     }
 
     if (!session.user.email_confirmed_at) {
       setError(
-        "Your email is not verified yet. Please click the verification link in your email."
+        "Your email has not been verified yet. Please click the verification link in your email."
       );
       return;
     }
@@ -225,9 +254,22 @@ export default function Auth() {
   const completeProfile = async () => {
     clearMessages();
 
-    if (!fullName || !username) {
+    if (!fullName.trim() || !username.trim()) {
       setError(
         "Please enter your full name and username."
+      );
+      return;
+    }
+
+    const cleanUsername = username
+      .trim()
+      .replace(/^@/, "")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+
+    if (cleanUsername.length < 3) {
+      setError(
+        "Username must be at least 3 characters."
       );
       return;
     }
@@ -246,11 +288,6 @@ export default function Auth() {
       setStep(1);
       return;
     }
-
-    const cleanUsername = username
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "");
 
     const { data: existingProfile } =
       await supabase
@@ -285,7 +322,9 @@ export default function Auth() {
       return;
     }
 
-    setMessage("Profile created successfully!");
+    setMessage(
+      "Your FreeText profile is ready!"
+    );
   };
 
   const submit = async (
@@ -300,6 +339,183 @@ export default function Auth() {
     }
   };
 
+  if (step === 2) {
+    return (
+      <main className="auth-page">
+        <div className="auth-glow auth-glow-one" />
+        <div className="auth-glow auth-glow-two" />
+
+        <section className="auth-card">
+          <div className="auth-brand">
+            <div className="auth-logo">F</div>
+            <span>FreeText</span>
+          </div>
+
+          <div className="auth-welcome-icon">
+            <Mail size={34} />
+          </div>
+
+          <h1 className="auth-heading">
+            Check your email
+          </h1>
+
+          <p className="auth-helper">
+            We've sent a verification link to
+          </p>
+
+          <strong className="auth-email">
+            {email}
+          </strong>
+
+          <p className="auth-helper">
+            Open the email and tap the FreeText
+            verification link to confirm your account.
+          </p>
+
+          {error && (
+            <div className="auth-error">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="auth-success">
+              <CheckCircle2 size={18} />
+              <span>{message}</span>
+            </div>
+          )}
+
+          <button
+            className="auth-primary-button"
+            type="button"
+            onClick={checkVerification}
+            disabled={loading}
+          >
+            {loading
+              ? "Checking..."
+              : "I've verified my email"}
+          </button>
+
+          <button
+            className="auth-phone-button"
+            type="button"
+            onClick={resendVerification}
+            disabled={
+              loading || resendSeconds > 0
+            }
+          >
+            {resendSeconds > 0
+              ? `Resend verification email in ${resendSeconds}s`
+              : "Resend verification email"}
+          </button>
+
+          <button
+            className="auth-phone-button"
+            type="button"
+            onClick={() => {
+              clearMessages();
+              setStep(1);
+            }}
+          >
+            <ArrowLeft size={17} />
+            Back to sign in
+          </button>
+
+          <p className="auth-terms">
+            Make sure to check your spam or junk folder
+            if you don't see the email.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (step === 3) {
+    return (
+      <main className="auth-page">
+        <div className="auth-glow auth-glow-one" />
+        <div className="auth-glow auth-glow-two" />
+
+        <section className="auth-card">
+          <div className="auth-brand">
+            <div className="auth-logo">F</div>
+            <span>FreeText</span>
+          </div>
+
+          <div className="auth-welcome-icon">
+            <CheckCircle2 size={34} />
+          </div>
+
+          <h1 className="auth-heading">
+            Complete your profile
+          </h1>
+
+          <p className="auth-helper">
+            Your email is verified. Let's finish setting
+            up your FreeText profile.
+          </p>
+
+          <form
+            className="auth-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              completeProfile();
+            }}
+          >
+            <div className="auth-input-wrap">
+              <User size={18} />
+              <input
+                className="auth-input"
+                type="text"
+                placeholder="Full name"
+                value={fullName}
+                onChange={(event) =>
+                  setFullName(event.target.value)
+                }
+              />
+            </div>
+
+            <div className="auth-input-wrap">
+              <AtSign size={18} />
+              <input
+                className="auth-input"
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(event) =>
+                  setUsername(event.target.value)
+                }
+              />
+            </div>
+
+            {error && (
+              <div className="auth-error">
+                {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="auth-success">
+                <CheckCircle2 size={18} />
+                <span>{message}</span>
+              </div>
+            )}
+
+            <button
+              className="auth-primary-button"
+              type="submit"
+              disabled={loading}
+            >
+              {loading
+                ? "Saving profile..."
+                : "Continue to FreeText"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-glow auth-glow-one" />
@@ -311,43 +527,194 @@ export default function Auth() {
           <span>FreeText</span>
         </div>
 
-        {step === 1 && (
-          <>
-            <h1 className="auth-heading">
-              {mode === "login"
-                ? "Welcome back"
-                : "Create your account"}
-            </h1>
+        <h1 className="auth-heading">
+          {mode === "login"
+            ? "Welcome back"
+            : "Create your account"}
+        </h1>
 
-            <p className="auth-helper">
-              {mode === "login"
-                ? "Sign in to continue to FreeText"
-                : "Join FreeText and connect with people"}
-            </p>
+        <p className="auth-helper">
+          {mode === "login"
+            ? "Sign in to continue to FreeText"
+            : "Join FreeText and connect with people"}
+        </p>
 
-            <div className="auth-mode-switch">
+        <div className="auth-mode-switch">
+          <button
+            type="button"
+            className={
+              mode === "login" ? "active" : ""
+            }
+            onClick={() => {
+              clearMessages();
+              setMode("login");
+            }}
+          >
+            Login
+          </button>
+
+          <button
+            type="button"
+            className={
+              mode === "signup" ? "active" : ""
+            }
+            onClick={() => {
+              clearMessages();
+              setMode("signup");
+            }}
+          >
+            Sign up
+          </button>
+        </div>
+
+        <form
+          className="auth-form"
+          onSubmit={submit}
+        >
+          {mode === "signup" && (
+            <>
+              <div className="auth-input-wrap">
+                <User size={18} />
+
+                <input
+                  className="auth-input"
+                  type="text"
+                  placeholder="Full name"
+                  value={fullName}
+                  onChange={(event) =>
+                    setFullName(event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="auth-input-wrap">
+                <AtSign size={18} />
+
+                <input
+                  className="auth-input"
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(event) =>
+                    setUsername(event.target.value)
+                  }
+                />
+              </div>
+            </>
+          )}
+
+          <div className="auth-input-wrap">
+            <Mail size={18} />
+
+            <input
+              className="auth-input"
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="auth-input-wrap">
+            <Lock size={18} />
+
+            <input
+              className="auth-input"
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
+              }
+              placeholder="Password"
+              value={password}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
+              autoComplete={
+                mode === "login"
+                  ? "current-password"
+                  : "new-password"
+              }
+            />
+
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() =>
+                setShowPassword(
+                  (current) => !current
+                )
+              }
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
+            >
+              {showPassword ? (
+                <EyeOff size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </button>
+          </div>
+
+          {error && (
+            <div className="auth-error">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="auth-success">
+              <CheckCircle2 size={18} />
+              <span>{message}</span>
+            </div>
+          )}
+
+          <button
+            className="auth-primary-button"
+            type="submit"
+            disabled={loading}
+          >
+            {loading
+              ? "Please wait..."
+              : mode === "login"
+              ? "Log in"
+              : "Create account"}
+          </button>
+        </form>
+
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
+
+        <button
+          className="auth-phone-button"
+          type="button"
+          onClick={() =>
+            setMessage(
+              "Phone sign-in will be available soon."
+            )
+          }
+        >
+          Continue with phone
+        </button>
+
+        <p className="auth-terms">
+          By continuing, you agree to the FreeText
+          Terms of Service and Privacy Policy.
+        </p>
+
+        <div className="auth-footer">
+          {mode === "login" ? (
+            <>
+              Don't have an account?{" "}
               <button
                 type="button"
-                className={
-                  mode === "login"
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  clearMessages();
-                  setMode("login");
-                }}
-              >
-                Login
-              </button>
-
-              <button
-                type="button"
-                className={
-                  mode === "signup"
-                    ? "active"
-                    : ""
-                }
                 onClick={() => {
                   clearMessages();
                   setMode("signup");
@@ -355,212 +722,22 @@ export default function Auth() {
               >
                 Sign up
               </button>
-            </div>
-
-            <form
-              className="auth-form"
-              onSubmit={submit}
-            >
-              {mode === "signup" && (
-                <>
-                  <input
-                    className="auth-input"
-                    type="text"
-                    placeholder="Full name"
-                    value={fullName}
-                    onChange={(event) =>
-                      setFullName(event.target.value)
-                    }
-                  />
-
-                  <input
-                    className="auth-input"
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(event) =>
-                      setUsername(event.target.value)
-                    }
-                  />
-                </>
-              )}
-
-              <input
-                className="auth-input"
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
-              />
-
-              <input
-                className="auth-input"
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
-              />
-
-              {error && (
-                <div className="auth-error">
-                  {error}
-                </div>
-              )}
-
-              {message && (
-                <div className="auth-message">
-                  {message}
-                </div>
-              )}
-
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
               <button
-                className="auth-primary-button"
-                type="submit"
-                disabled={loading}
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setMode("login");
+                }}
               >
-                {loading
-                  ? "Please wait..."
-                  : mode === "login"
-                  ? "Log in"
-                  : "Create account"}
+                Log in
               </button>
-            </form>
-          </>
-        )}
-
-        {step === 2 && (
-          <div className="auth-form">
-            <div className="auth-welcome-icon">
-              ✉️
-            </div>
-
-            <h1 className="auth-heading">
-              Check your email
-            </h1>
-
-            <p className="auth-helper">
-              We sent a FreeText verification link to:
-            </p>
-
-            <strong>{email}</strong>
-
-            <p className="auth-helper">
-              Open the email and click the verification
-              link to confirm your account.
-            </p>
-
-            {error && (
-              <div className="auth-error">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="auth-success">
-                {message}
-              </div>
-            )}
-
-            <button
-              className="auth-primary-button"
-              type="button"
-              onClick={checkVerification}
-              disabled={loading}
-            >
-              {loading
-                ? "Checking..."
-                : "I've verified my email"}
-            </button>
-
-            <button
-              className="auth-phone-button"
-              type="button"
-              onClick={resendVerification}
-              disabled={
-                loading || resendSeconds > 0
-              }
-            >
-              {resendSeconds > 0
-                ? `Resend email in ${resendSeconds}s`
-                : "Resend verification email"}
-            </button>
-
-            <button
-              className="auth-phone-button"
-              type="button"
-              onClick={() => {
-                clearMessages();
-                setStep(1);
-              }}
-            >
-              Back to login
-            </button>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="auth-form">
-            <div className="auth-welcome-icon">
-              ✓
-            </div>
-
-            <h1 className="auth-heading">
-              Complete your profile
-            </h1>
-
-            <p className="auth-helper">
-              Your email has been verified. Tell us a
-              little about yourself.
-            </p>
-
-            <input
-              className="auth-input"
-              type="text"
-              placeholder="Full name"
-              value={fullName}
-              onChange={(event) =>
-                setFullName(event.target.value)
-              }
-            />
-
-            <input
-              className="auth-input"
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(event) =>
-                setUsername(event.target.value)
-              }
-            />
-
-            {error && (
-              <div className="auth-error">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="auth-success">
-                {message}
-              </div>
-            )}
-
-            <button
-              className="auth-primary-button"
-              type="button"
-              onClick={completeProfile}
-              disabled={loading}
-            >
-              {loading
-                ? "Saving..."
-                : "Continue to FreeText"}
-            </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </section>
     </main>
   );
