@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Bell, Shield, UserPlus, X } from "lucide-react";
+import type { FormEvent } from "react";
+import { Bell, Lock, Shield, User, UserPlus, X } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import Navbar from "./components/Navbar";
 import Profile from "./components/Profile";
@@ -30,7 +31,7 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const login = async (event: React.FormEvent) => {
+  const login = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
     if (!email.trim() || !password) {
