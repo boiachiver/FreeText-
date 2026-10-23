@@ -1,62 +1,17 @@
-import { Plus } from "lucide-react";
+import { Plus, PlayCircle } from "lucide-react";
 
-type StoryPerson = {
-  name: string;
-  username: string;
-  avatar: string;
-};
+export type StoryPerson = { id?: string; name: string; username: string; avatar: string; mediaUrl?: string; createdAt?: string };
 
-type StoriesProps = {
-  suggestions: StoryPerson[];
-  onCreateStory: () => void;
-};
+type StoriesProps = { suggestions?: StoryPerson[]; onCreateStory?: () => void; onOpenStory?: (story: StoryPerson) => void };
 
-export default function Stories({
-  suggestions,
-  onCreateStory,
-}: StoriesProps) {
-  return (
-    <section className="stories-card">
-      <div className="section-title">
-        <h2>Stories</h2>
-        <button>See all</button>
-      </div>
-
-      <div className="stories">
-
-        <button
-          className="story add-story"
-          onClick={onCreateStory}
-        >
-          <span className="story-add">
-            <Plus size={20} />
-          </span>
-
-          <span>Your story</span>
-        </button>
-
-        {suggestions.map((person) => (
-          <button
-            className="story"
-            key={person.username}
-          >
-            <span className="story-ring">
-              <img
-                src={person.avatar}
-                alt={person.name}
-                className="avatar"
-                style={{
-                  width: 56,
-                  height: 56,
-                }}
-              />
-            </span>
-
-            <span>{person.username}</span>
-          </button>
-        ))}
-
-      </div>
-    </section>
-  );
+export default function Stories({ suggestions = [], onCreateStory = () => {}, onOpenStory = () => {} }: StoriesProps) {
+  return <section className="stories-card">
+    <div className="section-title"><h2>Stories</h2><span>24-hour updates</span></div>
+    <div className="stories">
+      <button className="story add-story" onClick={onCreateStory}><span className="story-add"><Plus size={20} /></span><span>Your story</span></button>
+      {suggestions.map((person, index) => <button className="story" key={person.id || person.username + index} onClick={() => onOpenStory(person)}>
+        <span className="story-ring">{person.mediaUrl ? <img src={person.mediaUrl} alt={person.name} className="avatar" style={{ width: 56, height: 56 }} /> : <img src={person.avatar} alt={person.name} className="avatar" style={{ width: 56, height: 56 }} />}{person.mediaUrl && <PlayCircle size={15} />}</span><span>{person.username}</span>
+      </button>)}
+    </div>
+  </section>;
 }
