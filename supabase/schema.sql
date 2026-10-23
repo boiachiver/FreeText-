@@ -42,34 +42,35 @@ create trigger protect_profile_roles_trigger before insert or update on public.p
 
 alter table public.profiles enable row level security; alter table public.posts enable row level security; alter table public.post_likes enable row level security; alter table public.comments enable row level security; alter table public.follows enable row level security; alter table public.conversations enable row level security; alter table public.conversation_members enable row level security; alter table public.messages enable row level security; alter table public.notifications enable row level security; alter table public.stories enable row level security; alter table public.reports enable row level security; alter table public.admin_audit_logs enable row level security;
 
-create policy if not exists profiles_read on public.profiles for select using (true);
-create policy if not exists profiles_self_write on public.profiles for all using (auth.uid() = id) with check (auth.uid() = id);
-create policy if not exists profiles_admin_write on public.profiles for update using (public.is_admin()) with check (public.is_admin());
-create policy if not exists posts_read on public.posts for select using (visibility = 'public' or author_id = auth.uid() or public.is_admin());
-create policy if not exists posts_insert on public.posts for insert with check (author_id = auth.uid());
-create policy if not exists posts_owner_update on public.posts for update using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
-create policy if not exists posts_owner_delete on public.posts for delete using (author_id = auth.uid() or public.is_admin());
-create policy if not exists likes_read on public.post_likes for select using (true);
-create policy if not exists likes_write on public.post_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy if not exists comments_read on public.comments for select using (true);
-create policy if not exists comments_write on public.comments for all using (author_id = auth.uid()) with check (author_id = auth.uid());
-create policy if not exists follows_read on public.follows for select using (true);
-create policy if not exists follows_write on public.follows for all using (follower_id = auth.uid()) with check (follower_id = auth.uid());
-create policy if not exists conversation_members_read on public.conversation_members for select using (user_id = auth.uid() or public.is_admin());
-create policy if not exists conversation_members_write on public.conversation_members for all using (user_id = auth.uid() or public.is_admin()) with check (user_id = auth.uid() or public.is_admin());
-create policy if not exists conversations_read on public.conversations for select using (exists(select 1 from public.conversation_members cm where cm.conversation_id = id and cm.user_id = auth.uid()) or public.is_admin());
-create policy if not exists conversations_insert on public.conversations for insert with check (created_by = auth.uid());
-create policy if not exists messages_read on public.messages for select using (exists(select 1 from public.conversation_members cm where cm.conversation_id = messages.conversation_id and cm.user_id = auth.uid()) or public.is_admin());
-create policy if not exists messages_insert on public.messages for insert with check (sender_id = auth.uid() and exists(select 1 from public.conversation_members cm where cm.conversation_id = messages.conversation_id and cm.user_id = auth.uid()));
-create policy if not exists messages_update on public.messages for update using (sender_id = auth.uid() or public.is_admin());
-create policy if not exists notifications_self on public.notifications for all using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy if not exists notifications_admin on public.notifications for select using (public.is_admin());
-create policy if not exists stories_read on public.stories for select using (expires_at > now() or author_id = auth.uid() or public.is_admin());
-create policy if not exists stories_write on public.stories for all using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
-create policy if not exists reports_owner_insert on public.reports for insert with check (reporter_id = auth.uid());
-create policy if not exists reports_admin on public.reports for all using (public.is_admin()) with check (public.is_admin());
-create policy if not exists audit_admin on public.admin_audit_logs for select using (public.is_admin());
-create policy if not exists audit_insert on public.admin_audit_logs for insert with check (public.is_admin() and admin_id = auth.uid());
+-- PostgreSQL does not support CREATE POLICY IF NOT EXISTS. These policies are created normally.
+create policy profiles_read on public.profiles for select using (true);
+create policy profiles_self_write on public.profiles for all using (auth.uid() = id) with check (auth.uid() = id);
+create policy profiles_admin_write on public.profiles for update using (public.is_admin()) with check (public.is_admin());
+create policy posts_read on public.posts for select using (visibility = 'public' or author_id = auth.uid() or public.is_admin());
+create policy posts_insert on public.posts for insert with check (author_id = auth.uid());
+create policy posts_owner_update on public.posts for update using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
+create policy posts_owner_delete on public.posts for delete using (author_id = auth.uid() or public.is_admin());
+create policy likes_read on public.post_likes for select using (true);
+create policy likes_write on public.post_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy comments_read on public.comments for select using (true);
+create policy comments_write on public.comments for all using (author_id = auth.uid()) with check (author_id = auth.uid());
+create policy follows_read on public.follows for select using (true);
+create policy follows_write on public.follows for all using (follower_id = auth.uid()) with check (follower_id = auth.uid());
+create policy conversation_members_read on public.conversation_members for select using (user_id = auth.uid() or public.is_admin());
+create policy conversation_members_write on public.conversation_members for all using (user_id = auth.uid() or public.is_admin()) with check (user_id = auth.uid() or public.is_admin());
+create policy conversations_read on public.conversations for select using (exists(select 1 from public.conversation_members cm where cm.conversation_id = id and cm.user_id = auth.uid()) or public.is_admin());
+create policy conversations_insert on public.conversations for insert with check (created_by = auth.uid());
+create policy messages_read on public.messages for select using (exists(select 1 from public.conversation_members cm where cm.conversation_id = messages.conversation_id and cm.user_id = auth.uid()) or public.is_admin());
+create policy messages_insert on public.messages for insert with check (sender_id = auth.uid() and exists(select 1 from public.conversation_members cm where cm.conversation_id = messages.conversation_id and cm.user_id = auth.uid()));
+create policy messages_update on public.messages for update using (sender_id = auth.uid() or public.is_admin());
+create policy notifications_self on public.notifications for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy notifications_admin on public.notifications for select using (public.is_admin());
+create policy stories_read on public.stories for select using (expires_at > now() or author_id = auth.uid() or public.is_admin());
+create policy stories_write on public.stories for all using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
+create policy reports_owner_insert on public.reports for insert with check (reporter_id = auth.uid());
+create policy reports_admin on public.reports for all using (public.is_admin()) with check (public.is_admin());
+create policy audit_admin on public.admin_audit_logs for select using (public.is_admin());
+create policy audit_insert on public.admin_audit_logs for insert with check (public.is_admin() and admin_id = auth.uid());
 
 create or replace function public.admin_set_banned(target uuid, banned boolean) returns void language plpgsql security definer set search_path = public as $$ begin if not public.is_admin() then raise exception 'admin access required'; end if; update public.profiles set is_banned = banned, updated_at = now() where id = target; insert into public.admin_audit_logs(admin_id, action, target_user_id, details) values(auth.uid(), case when banned then 'ban_user' else 'unban_user' end, target, jsonb_build_object('banned', banned)); end; $$;
 create or replace function public.admin_set_verified(target uuid, verified boolean) returns void language plpgsql security definer set search_path = public as $$ begin if not public.is_admin() then raise exception 'admin access required'; end if; update public.profiles set is_verified = verified, updated_at = now() where id = target; insert into public.admin_audit_logs(admin_id, action, target_user_id, details) values(auth.uid(), case when verified then 'verify_user' else 'unverify_user' end, target, jsonb_build_object('verified', verified)); end; $$;
@@ -79,10 +80,10 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
 
 insert into storage.buckets (id, name, public) values ('media', 'media', true) on conflict (id) do nothing;
-create policy if not exists media_read on storage.objects for select using (bucket_id = 'media');
-create policy if not exists media_insert on storage.objects for insert to authenticated with check (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy if not exists media_update on storage.objects for update to authenticated using (bucket_id = 'media' and owner_id = auth.uid()::text);
-create policy if not exists media_delete on storage.objects for delete to authenticated using (bucket_id = 'media' and owner_id = auth.uid()::text);
+create policy media_read on storage.objects for select using (bucket_id = 'media');
+create policy media_insert on storage.objects for insert to authenticated with check (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy media_update on storage.objects for update to authenticated using (bucket_id = 'media' and owner_id = auth.uid()::text);
+create policy media_delete on storage.objects for delete to authenticated using (bucket_id = 'media' and owner_id = auth.uid()::text);
 
 create index if not exists posts_created_idx on public.posts(created_at desc);
 create index if not exists messages_conversation_idx on public.messages(conversation_id, created_at);
