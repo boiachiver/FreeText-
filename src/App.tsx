@@ -24,6 +24,55 @@ function AdminDenied() {
   return <div className="auth-page"><div className="auth-card"><div className="auth-logo"><Shield size={30} /></div><h1>Admin access denied</h1><p className="auth-subtitle">This area is restricted to the FreeText super administrator.</p><button onClick={() => window.location.assign("/")}>Return to FreeText</button></div></div>;
 }
 
+function AdminLogin() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const login = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Enter the administrator email and password.");
+      return;
+    }
+    setLoading(true);
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (loginError || !data.session) {
+      setLoading(false);
+      setError(loginError?.message || "Unable to sign in.");
+      return;
+    }
+    const { data: allowed, error: roleError } = await supabase.rpc("is_super_admin");
+    setLoading(false);
+    if (roleError || !allowed) {
+      await supabase.auth.signOut();
+      setError("This account is not authorized as a FreeText super administrator.");
+      return;
+    }
+    window.location.reload();
+  };
+
+  return <div className="auth-page">
+    <div className="auth-glow auth-glow-one" />
+    <div className="auth-glow auth-glow-two" />
+    <section className="auth-card">
+      <div className="auth-brand"><div className="auth-logo"><Shield size={28} /></div><span>FreeText Admin</span></div>
+      <h1 className="auth-heading">Administrator Login</h1>
+      <p className="auth-helper">Secure access to the FreeText administration center.</p>
+      <form className="auth-form" onSubmit={login}>
+        <div className="auth-input-wrap"><User size={18} /><input className="auth-input" type="email" autoComplete="username" placeholder="Administrator email" value={email} onChange={e => setEmail(e.target.value)} /></div>
+        <div className="auth-input-wrap"><Lock size={18} /><input className="auth-input" type="password" autoComplete="current-password" placeholder="Administrator password" value={password} onChange={e => setPassword(e.target.value)} /></div>
+        {error && <div className="auth-error">{error}</div>}
+        <button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Signing in securely..." : "Sign in to Admin Center"}</button>
+        <button className="auth-phone-button" type="button" onClick={() => window.location.assign("/")}>Back to FreeText</button>
+      </form>
+      <p className="auth-terms">Admin access is restricted to authorized FreeText super administrators.</p>
+    </section>
+  </div>;
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -81,6 +130,7 @@ function App() {
 
   const filteredPeople = useMemo(() => people.filter(p => `${p.name} ${p.username}`.toLowerCase().includes(search.toLowerCase())), [people, search]);
   if (authLoading) return <LoadingScreen message="Loading your account..." />;
+  if (window.location.pathname === "/admin" && (!session || verificationGate)) return <AdminLogin />;
   if (!session || verificationGate) return <Auth />;
   if (profileLoading) return <LoadingScreen message="Loading your profile..." />;
 
