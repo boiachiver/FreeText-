@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MessageCircle, Phone, Search, Video } from "lucide-react";
 
-type Person = { name: string; username: string; avatar: string };
+type Person = { id: string; name: string; username: string; avatar: string };
 export type Conversation = Person & { lastMessage?: string; lastTime?: string; unread?: number; online?: boolean };
 type MessagesProps = { people?: Conversation[]; onOpenChat: (person: Person) => void; onCall?: (person: Person, video: boolean) => void };
 
