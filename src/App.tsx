@@ -131,7 +131,7 @@ function App() {
 
   const filteredPeople = useMemo(() => people.filter(p => `${p.name} ${p.username}`.toLowerCase().includes(search.toLowerCase())), [people, search]);
   if (authLoading) return <LoadingScreen message="Loading your account..." />;
-  if (window.location.pathname === "/admin" && (!session || verificationGate)) return <AdminLogin />;
+  if (window.location.pathname === "/admin" && (!session || verificationGate || (!profileLoading && !!profile && !profile.is_super_admin))) return <AdminLogin />;
   if (!session || verificationGate) return <Auth />;
   if (profileLoading) return <LoadingScreen message="Loading your profile..." />;
 
