@@ -1,7 +1,8 @@
 -- FreeText production schema for Supabase
 create extension if not exists pgcrypto;
 
-create table if not exists public.profiles (id uuid primary key references auth.users(id) on delete cascade, username text unique, full_name text, bio text default '', avatar_url text, phone text, is_admin boolean not null default false, is_verified boolean not null default false, is_banned boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists public.profiles (id uuid primary key references auth.users(id) on delete cascade, username text unique, full_name text, bio text default '', avatar_url text, phone text, is_admin boolean not null default false, is_super_admin boolean not null default false, is_verified boolean not null default false, is_banned boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+alter table public.profiles add column if not exists is_super_admin boolean not null default false;
 create table if not exists public.posts (id uuid primary key default gen_random_uuid(), author_id uuid not null references public.profiles(id) on delete cascade, caption text not null default '', image_url text, visibility text not null default 'public' check (visibility in ('public','followers','private')), created_at timestamptz not null default now(), updated_at timestamptz not null default now());
 create table if not exists public.post_likes (post_id uuid references public.posts(id) on delete cascade, user_id uuid references public.profiles(id) on delete cascade, created_at timestamptz not null default now(), primary key (post_id, user_id));
 create table if not exists public.comments (id uuid primary key default gen_random_uuid(), post_id uuid not null references public.posts(id) on delete cascade, author_id uuid not null references public.profiles(id) on delete cascade, body text not null, created_at timestamptz not null default now());
@@ -15,6 +16,7 @@ create table if not exists public.reports (id uuid primary key default gen_rando
 create table if not exists public.admin_audit_logs (id uuid primary key default gen_random_uuid(), admin_id uuid references public.profiles(id) on delete set null, action text not null, target_user_id uuid references public.profiles(id) on delete set null, target_post_id uuid references public.posts(id) on delete set null, details jsonb not null default '{}'::jsonb, created_at timestamptz not null default now());
 
 create or replace function public.is_admin(uid uuid default auth.uid()) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.profiles where id = uid and is_admin = true and is_banned = false); $$;
+create or replace function public.is_super_admin(uid uuid default auth.uid()) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.profiles where id = uid and is_super_admin = true and is_banned = false); $$;
 
 alter table public.profiles enable row level security; alter table public.posts enable row level security; alter table public.post_likes enable row level security; alter table public.comments enable row level security; alter table public.follows enable row level security; alter table public.conversations enable row level security; alter table public.conversation_members enable row level security; alter table public.messages enable row level security; alter table public.notifications enable row level security; alter table public.stories enable row level security; alter table public.reports enable row level security; alter table public.admin_audit_logs enable row level security;
 
@@ -54,7 +56,6 @@ create or replace function public.handle_new_user() returns trigger language plp
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
 
--- Public media bucket used by posts and stories.
 insert into storage.buckets (id, name, public) values ('media', 'media', true) on conflict (id) do nothing;
 create policy if not exists media_read on storage.objects for select using (bucket_id = 'media');
 create policy if not exists media_insert on storage.objects for insert to authenticated with check (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
