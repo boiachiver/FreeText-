@@ -45,7 +45,7 @@ textarea:focus-visible {
   transition: background 0.25s ease, color 0.25s ease;
 }
 
-.app.dark-mode {
+.apphtml.dark {
   background: #0d1117;
   color: #f1f5f9;
 }
@@ -62,7 +62,7 @@ textarea:focus-visible {
   backdrop-filter: blur(18px);
 }
 
-.dark-mode .topbar {
+html.dark .topbar {
   background: rgba(13, 17, 23, 0.94);
   border-color: #202733;
 }
@@ -86,7 +86,7 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
-.dark-mode .brand {
+html.dark .brand {
   color: #fff;
 }
 
@@ -114,7 +114,7 @@ textarea:focus-visible {
   color: #7a8495;
 }
 
-.dark-mode .search-box {
+html.dark .search-box {
   background: #171d26;
 }
 
@@ -123,7 +123,7 @@ textarea:focus-visible {
   background: #fff;
 }
 
-.dark-mode .search-box:focus-within {
+html.dark .search-box:focus-within {
   background: #11161e;
 }
 
@@ -153,8 +153,8 @@ textarea:focus-visible {
   color: #526071;
 }
 
-.dark-mode .icon-button,
-.dark-mode .profile-mini {
+html.dark .icon-button,
+html.dark .profile-mini {
   color: #cbd5e1;
 }
 
@@ -163,8 +163,8 @@ textarea:focus-visible {
   background: #eef2f7;
 }
 
-.dark-mode .icon-button:hover,
-.dark-mode .profile-mini:hover {
+html.dark .icon-button:hover,
+html.dark .profile-mini:hover {
   background: #1b2430;
 }
 
@@ -233,16 +233,16 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.dark-mode .nav-item {
+html.dark .nav-item {
   color: #aab5c5;
 }
 
-.dark-mode .nav-item:hover {
+html.dark .nav-item:hover {
   background: #171e29;
   color: white;
 }
 
-.dark-mode .nav-item.active {
+html.dark .nav-item.active {
   background: #172c53;
   color: #70a1ff;
 }
@@ -276,7 +276,7 @@ textarea:focus-visible {
   color: #778294;
 }
 
-.dark-mode .page-heading p {
+html.dark .page-heading p {
   color: #94a3b8;
 }
 
@@ -301,7 +301,7 @@ textarea:focus-visible {
   border-radius: 20px;
 }
 
-.dark-mode .stories-card {
+html.dark .stories-card {
   background: #121821;
   border-color: #222c39;
 }
@@ -344,7 +344,7 @@ textarea:focus-visible {
   color: #3d4858;
 }
 
-.dark-mode .story {
+html.dark .story {
   color: #d7dee9;
 }
 
@@ -366,7 +366,7 @@ textarea:focus-visible {
   color: #2563eb;
 }
 
-.dark-mode .story-add {
+html.dark .story-add {
   background: #1b2635;
 }
 
@@ -385,7 +385,7 @@ textarea:focus-visible {
   border-radius: 20px;
 }
 
-.dark-mode .post-card {
+html.dark .post-card {
   background: #121821;
   border-color: #222c39;
 }
@@ -457,7 +457,7 @@ textarea:focus-visible {
   border-top: 1px solid #edf0f4;
 }
 
-.dark-mode .post-actions {
+html.dark .post-actions {
   border-color: #222c39;
 }
 
@@ -492,7 +492,7 @@ textarea:focus-visible {
   border-radius: 24px;
 }
 
-.dark-mode .profile-card {
+html.dark .profile-card {
   background: #121821;
   border-color: #222c39;
 }
@@ -548,7 +548,7 @@ textarea:focus-visible {
   border-radius: 50%;
 }
 
-.dark-mode .profile-avatar-wrapper {
+html.dark .profile-avatar-wrapper {
   background: #121821;
 }
 
@@ -585,7 +585,7 @@ textarea:focus-visible {
   color: #586577;
 }
 
-.dark-mode .profile-bio {
+html.dark .profile-bio {
   color: #aab5c5;
 }
 
@@ -600,7 +600,7 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.dark-mode .modern-edit-button {
+html.dark .modern-edit-button {
   background: #202a37;
   color: white;
 }
@@ -612,7 +612,7 @@ textarea:focus-visible {
   border-top: 1px solid #edf0f4;
 }
 
-.dark-mode .profile-stats {
+html.dark .profile-stats {
   border-color: #222c39;
 }
 
@@ -654,7 +654,7 @@ textarea:focus-visible {
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2);
 }
 
-.dark-mode .create-modal {
+html.dark .create-modal {
   background: #151c26;
   color: white;
 }
@@ -680,7 +680,7 @@ textarea:focus-visible {
   color: #526071;
 }
 
-.dark-mode .modal-header button {
+html.dark .modal-header button {
   background: #222b37;
   color: white;
 }
@@ -715,8 +715,8 @@ textarea:focus-visible {
   resize: vertical;
 }
 
-.dark-mode .create-modal textarea,
-.dark-mode .create-modal input {
+html.dark .create-modal textarea,
+html.dark .create-modal input {
   background: #10161e;
   border-color: #2b3542;
   color: white;
@@ -774,7 +774,7 @@ textarea:focus-visible {
   cursor: pointer;
 }
 
-.dark-mode .upload-options label {
+html.dark .upload-options label {
   background: #202a37;
   color: white;
 }
@@ -836,8 +836,8 @@ textarea:focus-visible {
   border-radius: 20px;
 }
 
-.dark-mode .messages-card,
-.dark-mode .notification-card {
+html.dark .messages-card,
+html.dark .notification-card {
   background: #121821;
   border-color: #222c39;
 }
@@ -853,7 +853,7 @@ textarea:focus-visible {
   color: #7c8798;
 }
 
-.dark-mode .message-search {
+html.dark .message-search {
   background: #1a222d;
 }
 
@@ -874,7 +874,7 @@ textarea:focus-visible {
   border-top: 1px solid #edf0f4;
 }
 
-.dark-mode .message-row {
+html.dark .message-row {
   border-color: #222c39;
 }
 
@@ -916,7 +916,7 @@ textarea:focus-visible {
   color: #475569;
 }
 
-.dark-mode .message-call-actions button {
+html.dark .message-call-actions button {
   background: #202a37;
   color: #cbd5e1;
 }
@@ -954,7 +954,7 @@ textarea:focus-visible {
   border-radius: 20px;
 }
 
-.dark-mode .empty-state {
+html.dark .empty-state {
   background: #121821;
   border-color: #222c39;
 }
@@ -972,20 +972,20 @@ textarea:focus-visible {
 
 /* DARK MODE TEXT */
 
-.dark-mode .post-card,
-.dark-mode .profile-card,
-.dark-mode .stories-card,
-.dark-mode .messages-card,
-.dark-mode .notification-card,
-.dark-mode .empty-state {
+html.dark .post-card,
+html.dark .profile-card,
+html.dark .stories-card,
+html.dark .messages-card,
+html.dark .notification-card,
+html.dark .empty-state {
   color: #f1f5f9;
 }
 
-.dark-mode .post-actions button {
+html.dark .post-actions button {
   color: #aeb9c8;
 }
 
-.dark-mode .post-actions button:hover {
+html.dark .post-actions button:hover {
   background: #1b2430;
   color: #70a1ff;
 }
@@ -1149,7 +1149,7 @@ textarea:focus-visible {
     backdrop-filter: blur(18px);
   }
 
-  .dark-mode .mobile-bottom-nav {
+  html.dark .mobile-bottom-nav {
     background: rgba(13, 17, 23, 0.96);
     border-color: #222c39;
   }
@@ -1174,11 +1174,11 @@ textarea:focus-visible {
     font-weight: 700;
   }
 
-  .dark-mode .mobile-nav-item {
+  html.dark .mobile-nav-item {
     color: #9ba8b9;
   }
 
-  .dark-mode .mobile-nav-item.active {
+  html.dark .mobile-nav-item.active {
     color: #70a1ff;
     background: #172c53;
   }
@@ -1756,4 +1756,34 @@ html.dark .auth-success {
 
 .logout-button:active {
   transform: scale(0.95);
+}
+
+
+/* Shared theme support for FreeText and the Super Admin center */
+html.dark {
+  color-scheme: dark;
+  background: #0d1117;
+}
+html.dark body,
+html.dark #root,
+html.dark .app-shell {
+  background: #0d1117;
+  color: #e6edf3;
+}
+html.dark .create-modal,
+html.dark .page-section,
+html.dark .notification-modal {
+  background-color: #151c26;
+  color: #e6edf3;
+  border-color: #2b3542;
+}
+html.dark .create-modal p,
+html.dark .create-modal small,
+html.dark .page-section p,
+html.dark .page-section small {
+  color: #c0cad6;
+}
+html.dark .create-modal button:not(.publish-button),
+html.dark .page-section button {
+  color: inherit;
 }
