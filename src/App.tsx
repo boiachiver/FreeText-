@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { FormEvent } from "react";
-import { Bell, Lock, Shield, User, UserPlus, X } from "lucide-react";
+import { Bell, Lock, Moon, Shield, Sun, User, UserPlus, X } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import Navbar from "./components/Navbar";
 import Profile from "./components/Profile";
@@ -137,7 +137,7 @@ function App() {
 
   if (window.location.pathname === "/admin") {
     if (!profile?.is_super_admin) return <AdminDenied />;
-    return <div className="app-shell"><main className="main-content"><AdminDashboard onClose={() => window.location.assign("/")} /></main></div>;
+    return <div className="app-shell"><main className="main-content"><AdminDashboard onClose={() => window.location.replace("/")} /></main></div>;
   }
 
   return <div className="app-shell">
@@ -155,7 +155,7 @@ function App() {
     {commentPost && <div className="modal-backdrop" onClick={() => setCommentPost(null)}><div className="create-modal" onClick={e => e.stopPropagation()}><div className="modal-header"><h2>Comment</h2><button onClick={() => setCommentPost(null)}>×</button></div><p>{commentPost.caption}</p><textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Write a comment…" rows={4} /><button className="publish-button" onClick={comment}>Post comment</button></div></div>}
     {showNotifications && <div className="modal-backdrop" onClick={() => setShowNotifications(false)}><div className="notification-modal" onClick={e => e.stopPropagation()}><div className="modal-header"><h2><Bell size={20} /> Notifications</h2><button onClick={() => setShowNotifications(false)}>×</button></div>{notifications.length ? notifications.map(n => <div key={n.id} className="page-section"><strong>{n.type}</strong><p>{n.message}</p><small>{new Date(n.created_at).toLocaleString()}</small></div>) : <div className="notification-empty"><Bell size={30} /><h3>No notifications yet</h3><p>Likes and activity will appear here.</p></div>}</div></div>}
     {showAdmin && profile?.is_admin && <AdminDashboard onClose={() => setShowAdmin(false)} />}
-    <nav className="mobile-bottom-nav"><button onClick={() => setPage("home")} className={page === "home" ? "active" : ""}>🏠<span>Home</span></button><button onClick={() => setPage("explore")} className={page === "explore" ? "active" : ""}>🔍<span>Explore</span></button><button onClick={() => setShowCreate(true)}>➕<span>Create</span></button><button onClick={() => setPage("messages")} className={page === "messages" ? "active" : ""}>💬<span>Messages</span></button><button onClick={openProfile} className={page === "profile" ? "active" : ""}>👤<span>Profile</span></button>{profile?.is_admin && <button onClick={() => setShowAdmin(true)}><Shield size={18} /><span>Admin</span></button>}</nav>
+    <nav className="mobile-bottom-nav"><button onClick={() => setPage("home")} className={page === "home" ? "active" : ""}>🏠<span>Home</span></button><button onClick={() => setPage("explore")} className={page === "explore" ? "active" : ""}>🔍<span>Explore</span></button><button onClick={() => setShowCreate(true)}>➕<span>Create</span></button><button onClick={() => setPage("messages")} className={page === "messages" ? "active" : ""}>💬<span>Messages</span></button><button onClick={openProfile} className={page === "profile" ? "active" : ""}>👤<span>Profile</span></button><button onClick={() => setDarkMode(v => !v)} aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}<span>{darkMode ? "Light" : "Dark"}</span></button>{profile?.is_admin && <button onClick={() => setShowAdmin(true)}><Shield size={18} /><span>Admin</span></button>}</nav>
   </div>;
 }
 
