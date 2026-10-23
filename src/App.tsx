@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Bell, Shield, UserPlus, Users, X } from "lucide-react";
+import { Bell, Shield, UserPlus, X } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import Navbar from "./components/Navbar";
 import Profile from "./components/Profile";
@@ -19,6 +19,10 @@ type DbPost = { id: string; author_id: string; caption: string; image_url: strin
 type DbMessage = { id: string; body: string; sender_id: string; created_at: string };
 
 function LoadingScreen({ message }: { message: string }) { return <div className="auth-page"><div className="auth-card"><div className="auth-logo">💬</div><h1>FreeText</h1><p className="auth-subtitle">{message}</p></div></div>; }
+
+function AdminDenied() {
+  return <div className="auth-page"><div className="auth-card"><div className="auth-logo"><Shield size={30} /></div><h1>Admin access denied</h1><p className="auth-subtitle">This area is restricted to the FreeText super administrator.</p><button onClick={() => window.location.assign("/")}>Return to FreeText</button></div></div>;
+}
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -80,6 +84,11 @@ function App() {
   if (!session || verificationGate) return <Auth />;
   if (profileLoading) return <LoadingScreen message="Loading your profile..." />;
 
+  if (window.location.pathname === "/admin") {
+    if (!profile?.is_super_admin) return <AdminDenied />;
+    return <div className="app-shell"><main className="main-content"><AdminDashboard onClose={() => window.location.assign("/")} /></main></div>;
+  }
+
   return <div className="app-shell">
     <Navbar search={search} setSearch={setSearch} darkMode={darkMode} toggleDarkMode={() => setDarkMode(v => !v)} openCreate={() => setShowCreate(true)} openNotifications={() => setShowNotifications(true)} openProfile={openProfile} profileAvatar={profileAvatar} logout={logout} />
     <main className="main-content">
@@ -94,7 +103,7 @@ function App() {
     {selectedPerson && <Chat person={selectedPerson} messages={chatMessages} onSendMessage={sendMessage} onBack={() => { setSelectedPerson(null); setConversationId(null); setPage("messages"); }} />}
     {commentPost && <div className="modal-backdrop" onClick={() => setCommentPost(null)}><div className="create-modal" onClick={e => e.stopPropagation()}><div className="modal-header"><h2>Comment</h2><button onClick={() => setCommentPost(null)}>×</button></div><p>{commentPost.caption}</p><textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Write a comment…" rows={4} /><button className="publish-button" onClick={comment}>Post comment</button></div></div>}
     {showNotifications && <div className="modal-backdrop" onClick={() => setShowNotifications(false)}><div className="notification-modal" onClick={e => e.stopPropagation()}><div className="modal-header"><h2><Bell size={20} /> Notifications</h2><button onClick={() => setShowNotifications(false)}>×</button></div>{notifications.length ? notifications.map(n => <div key={n.id} className="page-section"><strong>{n.type}</strong><p>{n.message}</p><small>{new Date(n.created_at).toLocaleString()}</small></div>) : <div className="notification-empty"><Bell size={30} /><h3>No notifications yet</h3><p>Likes and activity will appear here.</p></div>}</div></div>}
-    {showAdmin && <AdminDashboard onClose={() => setShowAdmin(false)} />}
+    {showAdmin && profile?.is_admin && <AdminDashboard onClose={() => setShowAdmin(false)} />}
     <nav className="mobile-bottom-nav"><button onClick={() => setPage("home")} className={page === "home" ? "active" : ""}>🏠<span>Home</span></button><button onClick={() => setPage("explore")} className={page === "explore" ? "active" : ""}>🔍<span>Explore</span></button><button onClick={() => setShowCreate(true)}>➕<span>Create</span></button><button onClick={() => setPage("messages")} className={page === "messages" ? "active" : ""}>💬<span>Messages</span></button><button onClick={openProfile} className={page === "profile" ? "active" : ""}>👤<span>Profile</span></button>{profile?.is_admin && <button onClick={() => setShowAdmin(true)}><Shield size={18} /><span>Admin</span></button>}</nav>
   </div>;
 }
