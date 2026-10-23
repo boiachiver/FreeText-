@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Ban, CheckCircle, Clock, Crown, FileText, Flag, History, LayoutDashboard, RefreshCw, Search, Shield, ShieldCheck, Trash2, UserCog, Users, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Ban, CheckCircle, Clock, Crown, FileText, Flag, History, LayoutDashboard, Moon, RefreshCw, Search, Shield, ShieldCheck, Sun, Trash2, UserCog, Users, XCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type AdminDashboardProps = { onClose: () => void };
@@ -24,6 +24,12 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [currentUserId, setCurrentUserId] = useState("");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("freetext_dark_mode") === "true");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("freetext_dark_mode", String(darkMode));
+  }, [darkMode]);
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || "")); }, []);
 
@@ -88,7 +94,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   return <div className="modal-backdrop">
     <div className="create-modal" style={{ width: "min(1180px, 98vw)", maxHeight: "94vh", overflow: "auto" }} onClick={e => e.stopPropagation()}>
-      <div className="modal-header"><div><h2><Shield size={22} style={{ verticalAlign: "middle" }} /> FreeText Super Admin</h2><p>Platform control center · user safety · moderation · administrator access</p></div><button onClick={onClose} aria-label="Close admin center">×</button></div>
+      <div className="modal-header"><div><h2><Shield size={22} style={{ verticalAlign: "middle" }} /> FreeText Super Admin</h2><p>Platform control center · user safety · moderation · administrator access</p></div><div style={{ display: "flex", gap: 8, alignItems: "center" }}><button style={buttonStyle} onClick={() => setDarkMode(v => !v)} aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"} title={darkMode ? "Switch to light theme" : "Switch to dark theme"}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}{darkMode ? "Light" : "Dark"}</button><button onClick={onClose} aria-label="Close admin center">×</button></div></div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 16px" }}>
         {tabs.map(([id, label, Icon]) => <button key={id} style={{ ...buttonStyle, background: tab === id ? "var(--accent, #6750a4)" : "var(--surface, transparent)", color: tab === id ? "white" : "inherit" }} onClick={() => { setTab(id); setSearch(""); setFilter("all"); }}><Icon size={16} />{label}</button>)}
         <button style={buttonStyle} onClick={() => void load()} disabled={loading}><RefreshCw size={16} />{loading ? "Refreshing…" : "Refresh"}</button>
