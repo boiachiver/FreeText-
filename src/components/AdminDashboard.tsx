@@ -48,9 +48,9 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const runRpc = async (name: string, args: Record<string, unknown>, success: string) => {
+  const runRpc = async (name: "admin_set_role" | "admin_set_verified" | "admin_set_banned" | "admin_delete_post", args: Record<string, unknown>, success: string) => {
     setWorking(name); setError(""); setNotice("");
-    const { error: rpcError } = await supabase.rpc(name, args as never);
+    const { error: rpcError } = await supabase.rpc(name as any, args as any);
     setWorking("");
     if (rpcError) { setError(rpcError.message); return; }
     setNotice(success); await load();
