@@ -18,6 +18,28 @@ create table if not exists public.admin_audit_logs (id uuid primary key default 
 create or replace function public.is_admin(uid uuid default auth.uid()) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.profiles where id = uid and is_admin = true and is_banned = false); $$;
 create or replace function public.is_super_admin(uid uuid default auth.uid()) returns boolean language sql stable security definer set search_path = public as $$ select exists(select 1 from public.profiles where id = uid and is_super_admin = true and is_banned = false); $$;
 
+-- Prevent normal users from granting themselves admin/super-admin roles through profile updates.
+create or replace function public.protect_profile_roles() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if auth.uid() is not null and not public.is_super_admin() then
+      new.is_admin := false;
+      new.is_super_admin := false;
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if not public.is_admin() then
+      new.is_admin := old.is_admin;
+    end if;
+    if not public.is_super_admin() then
+      new.is_super_admin := old.is_super_admin;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists protect_profile_roles_trigger on public.profiles;
+create trigger protect_profile_roles_trigger before insert or update on public.profiles for each row execute function public.protect_profile_roles();
+
 alter table public.profiles enable row level security; alter table public.posts enable row level security; alter table public.post_likes enable row level security; alter table public.comments enable row level security; alter table public.follows enable row level security; alter table public.conversations enable row level security; alter table public.conversation_members enable row level security; alter table public.messages enable row level security; alter table public.notifications enable row level security; alter table public.stories enable row level security; alter table public.reports enable row level security; alter table public.admin_audit_logs enable row level security;
 
 create policy if not exists profiles_read on public.profiles for select using (true);
