@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Mail, Lock, User, AtSign, CheckCircle2, ArrowLeft, RefreshCw, ShieldCheck, Sparkles, Pencil, Inbox } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Mail, Lock, CheckCircle2, ArrowLeft, RefreshCw, ShieldCheck, Sparkles, Pencil, Inbox, Camera, Image as ImageIcon, X, Upload, UserRound, Check } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type AuthMode = "login" | "signup";
@@ -13,8 +13,6 @@ export default function Auth() {
   const [step, setStep] = useState<AuthStep>(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -22,37 +20,57 @@ export default function Auth() {
   const [resendSeconds, setResendSeconds] = useState(0);
   const [changingEmail, setChangingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [coverPreview, setCoverPreview] = useState("");
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
 
   const clearMessages = () => { setError(""); setMessage(""); };
 
+  const moveToProfile = () => {
+    localStorage.removeItem(PENDING_VERIFICATION_KEY);
+    setMessage("Email verified! Now make your FreeText profile yours.");
+    setStep(3);
+  };
+
   useEffect(() => {
+    const checkVerificationStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email_confirmed_at) moveToProfile();
+    };
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const verifiedRedirect = new URLSearchParams(window.location.search).get("verified") === "1";
       const pendingEmail = localStorage.getItem(PENDING_VERIFICATION_KEY);
       if (pendingEmail) setEmail(pendingEmail);
       if (verifiedRedirect) {
-        if (session?.user?.email_confirmed_at) {
-          localStorage.removeItem(PENDING_VERIFICATION_KEY);
-          setMessage("Your email has been verified successfully.");
-          setStep(3);
-        } else setStep(2);
+        await checkVerificationStatus();
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
       if (session?.user?.email_confirmed_at) setStep(3);
       else if (pendingEmail) setStep(2);
     };
+
     checkSession();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session?.user?.email_confirmed_at) {
-        localStorage.removeItem(PENDING_VERIFICATION_KEY);
-        setMessage("Your email has been verified successfully.");
-        setStep(3);
-      }
+      if (["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event) && session?.user?.email_confirmed_at) moveToProfile();
     });
-    return () => subscription.unsubscribe();
-  }, []);
+    const onFocus = () => { if (step === 2) checkVerificationStatus(); };
+    const onVisibility = () => { if (document.visibilityState === "visible" && step === 2) checkVerificationStatus(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const poll = window.setInterval(() => { if (step === 2) checkVerificationStatus(); }, 3500);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(poll);
+    };
+  }, [step]);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -81,18 +99,16 @@ export default function Auth() {
 
   const handleSignup = async () => {
     clearMessages();
-    if (!email.trim() || !password || !fullName.trim() || !username.trim()) { setError("Please complete all fields."); return; }
+    if (!email.trim() || !password) { setError("Enter your email and create a password to get started."); return; }
     if (password.length < 6) { setError("Your password must be at least 6 characters."); return; }
-    const cleanUsername = username.trim().replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
-    if (cleanUsername.length < 3) { setError("Username must be at least 3 characters."); return; }
     setLoading(true);
     const { data, error: signupError } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: VERIFICATION_REDIRECT } });
     setLoading(false);
     if (signupError) { setError(signupError.message); return; }
-    if (data.session) { localStorage.removeItem(PENDING_VERIFICATION_KEY); setMessage("Account created successfully."); setStep(3); }
+    if (data.session) { localStorage.removeItem(PENDING_VERIFICATION_KEY); setStep(3); }
     else {
       localStorage.setItem(PENDING_VERIFICATION_KEY, email.trim().toLowerCase());
-      setMessage("We've sent a verification email to your inbox.");
+      setMessage("We've sent a verification link to your inbox.");
       setStep(2);
       setResendSeconds(RESEND_COOLDOWN);
     }
@@ -110,120 +126,152 @@ export default function Auth() {
     setLoading(false);
     if (resendError) { setError(resendError.message); return; }
     localStorage.setItem(PENDING_VERIFICATION_KEY, verificationEmail.toLowerCase());
-    setMessage("A fresh verification email is on its way. Check your inbox and spam folder.");
+    setMessage("A fresh verification link is on its way. Check your inbox and spam folder.");
     setResendSeconds(RESEND_COOLDOWN);
   };
 
-  // For an unverified signup there is normally no authenticated session, so updateUser()
-  // cannot be used yet. We create/resume the signup for the new address, then explicitly
-  // resend the signup confirmation. This also handles an already-unverified target email.
   const changeEmailAndResend = async () => {
     clearMessages();
     const targetEmail = newEmail.trim().toLowerCase();
     if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) { setError("Enter a valid email address."); return; }
     if (targetEmail === email.trim().toLowerCase()) { setError("That's already the email on this screen."); return; }
-    if (!password) { setError("For security, go back and enter your password before changing the email."); return; }
-
+    if (!password) { setError("Go back and enter your password before changing the email."); return; }
     setLoading(true);
-    const { data: signupData, error: signupError } = await supabase.auth.signUp({
-      email: targetEmail,
-      password,
-      options: { emailRedirectTo: VERIFICATION_REDIRECT },
-    });
-
-    if (signupError) {
-      setLoading(false);
-      setError(signupError.message);
-      return;
-    }
-
-    // signUp() can return an existing unconfirmed user without a session. Explicitly
-    // resend so the new address receives the confirmation link.
-    const { error: resendError } = await supabase.auth.resend({
-      type: "signup",
-      email: targetEmail,
-      options: { emailRedirectTo: VERIFICATION_REDIRECT },
-    });
+    const { error: signupError } = await supabase.auth.signUp({ email: targetEmail, password, options: { emailRedirectTo: VERIFICATION_REDIRECT } });
+    if (signupError) { setLoading(false); setError(signupError.message); return; }
+    const { error: resendError } = await supabase.auth.resend({ type: "signup", email: targetEmail, options: { emailRedirectTo: VERIFICATION_REDIRECT } });
     setLoading(false);
-
-    if (resendError) {
-      const msg = resendError.message.toLowerCase();
-      if (msg.includes("rate limit") || msg.includes("too many")) {
-        setError("Too many verification emails were requested. Please wait a little and try again.");
-      } else if (msg.includes("not found") || msg.includes("user")) {
-        setError("We couldn't send a verification email to that address. Please check the address and try again.");
-      } else {
-        setError(resendError.message);
-      }
-      return;
-    }
-
+    if (resendError) { setError(resendError.message); return; }
     setEmail(targetEmail);
     localStorage.setItem(PENDING_VERIFICATION_KEY, targetEmail);
     setNewEmail("");
     setChangingEmail(false);
-    setMessage(`Verification email sent to ${targetEmail}. Check that inbox and spam folder.`);
+    setMessage(`Verification email sent to ${targetEmail}.`);
     setResendSeconds(RESEND_COOLDOWN);
   };
 
-  const checkVerification = async () => {
+  const selectImage = (file: File | undefined, type: "avatar" | "cover") => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
+    if (file.size > 8 * 1024 * 1024) { setError("Please choose an image smaller than 8MB."); return; }
     clearMessages();
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    setLoading(false);
-    if (!session?.user) { setError("We couldn't find an active session. Open the verification link from your email, then return here."); return; }
-    if (!session.user.email_confirmed_at) { setError("Your email is not verified yet. Open the FreeText verification email and tap the verification link."); return; }
-    localStorage.removeItem(PENDING_VERIFICATION_KEY);
-    setMessage("Email verified successfully! Welcome to FreeText.");
-    setStep(3);
+    const url = URL.createObjectURL(file);
+    if (type === "avatar") {
+      setAvatarFile(file);
+      setAvatarPreview(url);
+    } else {
+      setCoverFile(file);
+      setCoverPreview(url);
+    }
+  };
+
+  const uploadImage = async (file: File, folder: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Your session has expired. Please sign in again.");
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${folder}/${user.id}/${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("media").upload(path, file, { upsert: true, contentType: file.type });
+    if (uploadError) throw uploadError;
+    const { data } = supabase.storage.from("media").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const completeProfile = async () => {
     clearMessages();
-    if (!fullName.trim() || !username.trim()) { setError("Please enter your full name and username."); return; }
-    const cleanUsername = username.trim().replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
-    if (cleanUsername.length < 3) { setError("Username must be at least 3 characters."); return; }
+    if (!avatarFile && !coverFile) { setError("Add at least a profile picture or cover photo to continue."); return; }
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); setError("Your session has expired. Please sign in again."); setStep(1); return; }
-    const { data: existingProfile } = await supabase.from("profiles").select("id").eq("username", cleanUsername).maybeSingle();
-    if (existingProfile && existingProfile.id !== user.id) { setLoading(false); setError("That username is already taken."); return; }
-    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, username: cleanUsername, full_name: fullName.trim(), bio: "", avatar_url: "", cover_url: "" });
-    setLoading(false);
-    if (profileError) { setError(profileError.message); return; }
-    localStorage.removeItem(PENDING_VERIFICATION_KEY);
-    setMessage("Your FreeText profile is ready!");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Your session has expired. Please sign in again.");
+      const existing = await supabase.from("profiles").select("username, full_name, avatar_url, cover_url").eq("id", user.id).maybeSingle();
+      const avatarUrl = avatarFile ? await uploadImage(avatarFile, "profiles/avatar") : (existing.data?.avatar_url || "");
+      const coverUrl = coverFile ? await uploadImage(coverFile, "profiles/cover") : (existing.data?.cover_url || "");
+      const fallbackName = (user.user_metadata?.full_name || user.email?.split("@")[0] || "FreeText User").trim();
+      const fallbackUsername = (user.user_metadata?.username || user.email?.split("@")[0] || `user${user.id.slice(0, 8)}`).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().slice(0, 30) || `user${user.id.slice(0, 8)}`;
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: user.id,
+        username: existing.data?.username || fallbackUsername,
+        full_name: existing.data?.full_name || fallbackName,
+        bio: "",
+        avatar_url: avatarUrl,
+        cover_url: coverUrl,
+      });
+      if (profileError) throw profileError;
+      localStorage.removeItem(PENDING_VERIFICATION_KEY);
+      setMessage("Your profile is ready. Welcome to FreeText!");
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "We couldn't finish your profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const submit = async (event: React.FormEvent) => { event.preventDefault(); if (mode === "login") await handleLogin(); else await handleSignup(); };
 
   if (step === 2) return (
     <main className="auth-page">
-      <style>{` .verification-card{position:relative;overflow:hidden;max-width:520px!important;background:rgba(255,255,255,.96)!important;border:1px solid rgba(255,255,255,.8)!important;box-shadow:0 30px 90px rgba(31,41,55,.18),0 8px 28px rgba(37,99,235,.08)!important} html.dark .verification-card{background:rgba(18,24,33,.97)!important;border-color:#263242!important}.verification-visual{height:150px;margin:-4px -4px 22px;border-radius:22px;background:linear-gradient(135deg,#eef5ff,#f7f9ff);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}html.dark .verification-visual{background:linear-gradient(135deg,#13233d,#17202d)}.verification-visual:before,.verification-visual:after{content:"";position:absolute;border-radius:999px;background:rgba(37,99,235,.08);animation:verifyPulse 3s ease-in-out infinite}.verification-visual:before{width:180px;height:180px}.verification-visual:after{width:250px;height:250px;animation-delay:1s}.verify-scene{position:relative;z-index:2;width:220px;height:110px}.verify-mail{position:absolute;left:35px;top:28px;width:82px;height:60px;border-radius:14px;background:white;border:1px solid #dce7f8;box-shadow:0 14px 28px rgba(37,99,235,.16);display:grid;place-items:center;color:#2563eb;animation:mailFloat 2.8s ease-in-out infinite}.verify-arrow{position:absolute;left:115px;top:50px;width:55px;height:2px;background:#8db0f5;animation:arrowGlow 1.8s ease-in-out infinite}.verify-arrow:after{content:"";position:absolute;right:0;top:-4px;width:9px;height:9px;border-top:2px solid #2563eb;border-right:2px solid #2563eb;transform:rotate(45deg)}.verify-inbox{position:absolute;right:12px;top:23px;width:72px;height:70px;border-radius:16px;background:#eaf1ff;border:1px solid #cfe0ff;display:grid;place-items:center;color:#2563eb;animation:inboxGlow 2.8s ease-in-out infinite}.verify-check{position:absolute;right:0;bottom:8px;width:30px;height:30px;border-radius:50%;background:#22c55e;color:white;display:grid;place-items:center;border:3px solid white;box-shadow:0 6px 15px rgba(34,197,94,.28);animation:checkPop 2.8s ease-in-out infinite}@keyframes mailFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}@keyframes inboxGlow{0%,100%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 28px rgba(37,99,235,.18)}}@keyframes arrowGlow{0%,100%{opacity:.45;width:45px}50%{opacity:1;width:58px}}@keyframes checkPop{0%,65%,100%{transform:scale(1)}72%{transform:scale(1.16)}}@keyframes verifyPulse{0%,100%{transform:scale(.85);opacity:.45}50%{transform:scale(1.08);opacity:.9}}.verification-badge{width:max-content;max-width:100%;margin:0 auto 12px;padding:7px 11px;border-radius:999px;background:#edf7ef;color:#16803b;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}.verification-lead{max-width:400px;margin-left:auto;margin-right:auto}.verification-email-box{margin:18px 0;padding:15px 16px;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:15px;background:#f5f8ff;border:1px solid #dce7fb;color:#25324a;word-break:break-word}.verification-email-box strong{font-size:14px}.verification-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 20px}.verification-step{padding:12px 8px;border:1px solid #e7ebf2;border-radius:14px;background:#fafbfd;text-align:center}.verification-step span{width:26px;height:26px;margin:0 auto 7px;display:grid;place-items:center;border-radius:50%;background:#e8f0ff;color:#2563eb;font-size:12px;font-weight:900}.verification-step p{font-size:11px;line-height:1.35;color:#667085}.verification-resend-box{margin-top:15px;padding:15px;border-radius:16px;background:linear-gradient(135deg,#f8faff,#f3f7ff);border:1px solid #e0e8f8;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left}.verification-resend-copy{display:flex;flex-direction:column;gap:4px;min-width:0}.verification-resend-copy strong{font-size:13px}.verification-resend-copy span{font-size:11px;color:#7b8798;line-height:1.4}.verification-resend-button{flex:0 0 auto;min-height:40px;padding:0 13px;border-radius:11px;background:#2563eb;color:white;font-size:12px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap}.verification-resend-button:disabled{opacity:.55;cursor:not-allowed}.change-email-link{margin:16px auto 4px;background:transparent;color:#2563eb;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px}.change-email-panel{margin:12px 0 4px;padding:14px;border-radius:15px;background:#f8fafc;border:1px solid #e2e8f0;text-align:left}.change-email-panel label{display:block;margin-bottom:7px;font-size:12px;font-weight:800;color:#475569}.change-email-row{display:flex;gap:8px}.change-email-row input{flex:1;min-width:0;border:1px solid #d6deea;border-radius:10px;padding:10px 12px;background:white;color:#172033}.change-email-row button{padding:0 13px;border-radius:10px;background:#172033;color:white;font-weight:800;font-size:12px}.change-email-cancel{margin-top:8px;background:transparent;color:#64748b;font-size:11px}.verification-tip{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;font-size:11px;color:#8490a2;line-height:1.45}@media(max-width:520px){.verification-card{padding:18px!important;border-radius:22px!important}.verification-visual{height:132px}.verification-steps{gap:6px}.verification-step{padding:10px 5px}.verification-resend-box{flex-direction:column;align-items:stretch}.verification-resend-button{justify-content:center}.change-email-row{flex-direction:column}.change-email-row button{height:42px}}`}</style>
-      <div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" />
+      <style>{verificationStyles}</style>
       <section className="auth-card verification-card">
-        <div className="auth-brand"><div className="auth-logo">F</div><span>FreeText</span></div>
-        <div className="verification-visual" aria-hidden="true"><div className="verify-scene"><div className="verify-mail"><Mail size={28} /></div><div className="verify-arrow" /><div className="verify-inbox"><Inbox size={30} /></div><div className="verify-check"><CheckCircle2 size={15} /></div></div></div>
-        <div className="verification-badge"><ShieldCheck size={15} /> Secure email verification</div>
-        <h1 className="auth-heading">Check your email</h1>
-        <p className="auth-helper verification-lead">Your FreeText account is almost ready. We sent a secure verification link to:</p>
-        <div className="verification-email-box"><Mail size={18} /><strong>{email || "your email address"}</strong></div>
-        <div className="verification-steps"><div className="verification-step"><span>1</span><p>Open the FreeText email.</p></div><div className="verification-step"><span>2</span><p>Tap the verify link.</p></div><div className="verification-step"><span>3</span><p>Come back and continue.</p></div></div>
-        {error && <div className="auth-error">{error}</div>}{message && <div className="auth-success"><CheckCircle2 size={18} /><span>{message}</span></div>}
-        <button className="auth-primary-button verification-primary" type="button" onClick={checkVerification} disabled={loading}>{loading ? "Checking your verification..." : "I've verified my email"}</button>
-        <div className="verification-resend-box"><div className="verification-resend-copy"><strong>Didn't receive the email?</strong><span>Check spam or junk, then request another link.</span></div><button className="verification-resend-button" type="button" onClick={resendVerification} disabled={loading || resendSeconds > 0}><RefreshCw size={17} />{loading ? "Sending..." : resendSeconds > 0 ? `Resend in ${resendSeconds}s` : "Resend email"}</button></div>
-        {!changingEmail ? <button className="change-email-link" type="button" onClick={() => { clearMessages(); setNewEmail(""); setChangingEmail(true); }}><Pencil size={14} /> Change email address</button> : <div className="change-email-panel"><label htmlFor="change-email">Use a different email</label><div className="change-email-row"><input id="change-email" type="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="new@email.com" autoComplete="email" /><button type="button" onClick={changeEmailAndResend} disabled={loading}>{loading ? "Sending..." : "Send there"}</button></div><button className="change-email-cancel" type="button" onClick={() => setChangingEmail(false)}>Cancel</button></div>}
-        <button className="auth-phone-button" type="button" onClick={() => { clearMessages(); setChangingEmail(false); setStep(1); }}><ArrowLeft size={17} /> Back to sign in</button>
-        <p className="verification-tip"><Sparkles size={13} /> Tip: search your inbox for “FreeText” if the email isn't visible yet.</p>
+        <div className="verification-visual"><div className="verify-scene"><div className="verify-mail"><Mail size={30}/></div><div className="verify-arrow"/><div className="verify-inbox"><Inbox size={31}/><div className="verify-check"><Check size={16}/></div></div></div></div>
+        <div className="verification-badge"><ShieldCheck size={14}/> Secure email verification</div>
+        <h1>Check your email</h1>
+        <p className="auth-subtitle verification-lead">Tap the FreeText verification link. When you return, we'll detect it automatically.</p>
+        <div className="verification-email-box"><Mail size={17}/><strong>{email}</strong></div>
+        <div className="auto-check"><span className="live-dot"/> Waiting for verification automatically</div>
+        <div className="verification-steps"><div className="verification-step"><span>1</span><p>Open the email</p></div><div className="verification-step"><span>2</span><p>Tap verify</p></div><div className="verification-step"><span>3</span><p>Return to FreeText</p></div></div>
+        {message && <div className="auth-message">{message}</div>}
+        {error && <div className="auth-error">{error}</div>}
+        <div className="verification-resend-box"><div className="verification-resend-copy"><strong>Didn't receive it?</strong><span>Check spam or junk, then request another link.</span></div><button className="verification-resend-button" type="button" onClick={resendVerification} disabled={resendSeconds > 0 || loading}><RefreshCw size={14}/>{resendSeconds > 0 ? `${resendSeconds}s` : "Resend"}</button></div>
+        {!changingEmail ? <button className="change-email-link" type="button" onClick={() => { clearMessages(); setChangingEmail(true); }}><Pencil size={14}/> Use a different email</button> : <div className="change-email-panel"><label>New email address</label><input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="you@example.com" type="email" autoComplete="email"/><div className="change-actions"><button type="button" onClick={() => setChangingEmail(false)}>Cancel</button><button type="button" onClick={changeEmailAndResend} disabled={loading}>{loading ? "Sending..." : "Send code there"}</button></div></div>}
+        <button className="auth-back-button" type="button" onClick={() => { clearMessages(); setStep(1); }}><ArrowLeft size={15}/> Back to sign in</button>
       </section>
     </main>
   );
 
   if (step === 3) return (
-    <main className="auth-page"><div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" /><section className="auth-card"><div className="auth-brand"><div className="auth-logo">F</div><span>FreeText</span></div><div className="auth-welcome-icon"><CheckCircle2 size={34} /></div><h1 className="auth-heading">Complete your profile</h1><p className="auth-helper">Your email is verified. Let's finish setting up your FreeText profile.</p><form className="auth-form" onSubmit={(event) => { event.preventDefault(); completeProfile(); }}><div className="auth-input-wrap"><User size={18} /><input className="auth-input" type="text" placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} /></div><div className="auth-input-wrap"><AtSign size={18} /><input className="auth-input" type="text" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} /></div>{error && <div className="auth-error">{error}</div>}{message && <div className="auth-success"><CheckCircle2 size={18} /><span>{message}</span></div>}<button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Saving profile..." : "Continue to FreeText"}</button></form></section></main>
+    <main className="auth-page">
+      <style>{profileStyles}</style>
+      <section className="auth-card profile-setup-card">
+        <div className="profile-setup-top"><div className="profile-sparkle"><Sparkles size={20}/></div><span>Almost there</span></div>
+        <h1>Make your profile yours</h1>
+        <p className="auth-subtitle">Add a profile picture and cover photo. You can change them anytime.</p>
+        <div className="profile-preview" style={{ backgroundImage: coverPreview ? `url(${coverPreview})` : undefined }}>
+          {!coverPreview && <div className="cover-placeholder"><ImageIcon size={28}/><span>Add cover photo</span></div>}
+          {coverPreview && <button className="remove-cover" type="button" onClick={() => { setCoverFile(null); setCoverPreview(""); }} aria-label="Remove cover"><X size={15}/></button>}
+          <div className="avatar-wrap"><div className="avatar-preview">{avatarPreview ? <img src={avatarPreview} alt="Profile preview"/> : <UserRound size={42}/>}</div><button className="avatar-edit" type="button" onClick={() => avatarInput.current?.click()} aria-label="Add profile picture"><Camera size={16}/></button></div>
+          <div className="profile-name-preview">Your profile</div>
+        </div>
+        <input ref={avatarInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "avatar")}/>
+        <input ref={coverInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "cover")}/>
+        <div className="photo-options"><button type="button" className="photo-option" onClick={() => avatarInput.current?.click()}><span><Camera size={19}/></span><strong>Profile picture</strong><small>{avatarFile ? "Photo selected" : "Add your face or favorite photo"}</small>{avatarFile && <CheckCircle2 size={17} className="selected-check"/>}</button><button type="button" className="photo-option" onClick={() => coverInput.current?.click()}><span><ImageIcon size={19}/></span><strong>Cover photo</strong><small>{coverFile ? "Photo selected" : "Show your style"}</small>{coverFile && <CheckCircle2 size={17} className="selected-check"/>}</button></div>
+        {message && <div className="auth-message">{message}</div>}
+        {error && <div className="auth-error">{error}</div>}
+        <button className="auth-primary-button profile-finish" type="button" onClick={completeProfile} disabled={loading}>{loading ? <><RefreshCw size={17} className="spin"/> Setting up your profile...</> : <><Sparkles size={17}/> Finish profile</>}</button>
+        <p className="profile-note"><ShieldCheck size={14}/> Your photos are private to your account until you choose to share them.</p>
+      </section>
+    </main>
   );
 
   return (
-    <main className="auth-page"><div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" /><section className="auth-card"><div className="auth-brand"><div className="auth-logo">F</div><span>FreeText</span></div><h1 className="auth-heading">{mode === "login" ? "Welcome back" : "Create your account"}</h1><p className="auth-helper">{mode === "login" ? "Sign in to continue to FreeText" : "Join FreeText and connect with people"}</p><div className="auth-mode-switch"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => { clearMessages(); setMode("login"); }}>Login</button><button type="button" className={mode === "signup" ? "active" : ""} onClick={() => { clearMessages(); setMode("signup"); }}>Sign up</button></div><form className="auth-form" onSubmit={submit}>{mode === "signup" && <><div className="auth-input-wrap"><User size={18} /><input className="auth-input" type="text" placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} /></div><div className="auth-input-wrap"><AtSign size={18} /><input className="auth-input" type="text" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} /></div>}<div className="auth-input-wrap"><Mail size={18} /><input className="auth-input" type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></div><div className="auth-input-wrap"><Lock size={18} /><input className="auth-input" type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} /><button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>{error && <div className="auth-error">{error}</div>}{message && <div className="auth-success"><CheckCircle2 size={18} /><span>{message}</span></div>}<button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}</button></form><div className="auth-divider"><span>or</span></div><button className="auth-phone-button" type="button" onClick={() => setMessage("Phone sign-in will be available soon.")}>Continue with phone</button><p className="auth-terms">By continuing, you agree to the FreeText Terms of Service and Privacy Policy.</p><div className="auth-footer">{mode === "login" ? <>Don't have an account? <button type="button" onClick={() => { clearMessages(); setMode("signup"); }}>Sign up</button></> : <>Already have an account? <button type="button" onClick={() => { clearMessages(); setMode("login"); }}>Log in</button></>}</div></section></main>
+    <main className="auth-page"><style>{baseStyles}</style><section className="auth-card">
+      <div className="brand-mark"><span>F</span></div><div className="brand-label">FreeText</div>
+      <h1>{mode === "login" ? "Welcome back" : "Join FreeText"}</h1>
+      <p className="auth-subtitle">{mode === "login" ? "Sign in to continue to your social world." : "Create your account in seconds. We'll help you finish your profile next."}</p>
+      {message && <div className="auth-message">{message}</div>}{error && <div className="auth-error">{error}</div>}
+      <form onSubmit={submit}>
+        <label>Email address</label><div className="input-wrap"><Mail size={17}/><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></div>
+        <label>Password</label><div className="input-wrap"><Lock size={17}/><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete={mode === "login" ? "current-password" : "new-password"}/><button type="button" className="icon-button" onClick={() => setShowPassword((v) => !v)} aria-label="Show password">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div>
+        <button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}</button>
+      </form>
+      <div className="auth-divider"><span>or</span></div>
+      <button className="mode-switch" type="button" onClick={() => { clearMessages(); setMode(mode === "login" ? "signup" : "login"); }}>{mode === "login" ? "New to FreeText? Create an account" : "Already have an account? Sign in"}</button>
+    </section></main>
   );
 }
+
+const baseStyles = `.auth-page{min-height:100vh;display:grid;place-items:center;padding:22px 16px;background:radial-gradient(circle at 15% 10%,#e8f0ff 0,transparent 30%),linear-gradient(135deg,#f7f9fc,#eef3f9);font-family:Inter,system-ui,sans-serif}.auth-card{width:100%;max-width:440px;background:rgba(255,255,255,.96);border:1px solid #e7ebf2;border-radius:26px;padding:30px;box-shadow:0 28px 80px rgba(15,23,42,.13)}.brand-mark{width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#2563eb,#4f46e5);display:grid;place-items:center;color:#fff;font-size:24px;font-weight:900;margin-bottom:9px;box-shadow:0 10px 24px rgba(37,99,235,.25)}.brand-mark span{transform:translateY(-1px)}.brand-label{font-size:13px;font-weight:800;color:#2563eb;margin-bottom:20px}.auth-card h1{font-size:28px;line-height:1.15;margin:0 0 8px;color:#101828;letter-spacing:-.6px}.auth-subtitle{margin:0 0 22px;color:#667085;font-size:14px;line-height:1.55}.auth-card form label{display:block;margin:15px 0 7px;font-size:12px;font-weight:800;color:#344054}.input-wrap{height:50px;border:1px solid #dfe4ec;border-radius:14px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 13px;color:#98a2b3;transition:.2s}.input-wrap:focus-within{border-color:#7da5f7;box-shadow:0 0 0 4px rgba(37,99,235,.08)}.input-wrap input{border:0;outline:0;min-width:0;flex:1;font:inherit;font-size:14px;color:#101828;background:transparent}.icon-button{border:0;background:transparent;color:#98a2b3;padding:5px;display:grid;place-items:center}.auth-primary-button{width:100%;min-height:50px;margin-top:20px;border:0;border-radius:14px;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;font-size:14px;font-weight:850;display:flex;justify-content:center;align-items:center;gap:8px;box-shadow:0 12px 25px rgba(37,99,235,.22)}.auth-primary-button:disabled{opacity:.65}.auth-divider{display:flex;align-items:center;gap:12px;color:#98a2b3;font-size:12px;margin:22px 0}.auth-divider:before,.auth-divider:after{content:"";height:1px;background:#e6e9ef;flex:1}.mode-switch,.auth-back-button{border:0;background:transparent;color:#2563eb;font-weight:800;font-size:13px;width:100%;padding:8px}.auth-message{margin:14px 0;padding:11px 13px;border-radius:12px;background:#eef9f1;color:#147a37;font-size:12px;line-height:1.45}.auth-error{margin:14px 0;padding:11px 13px;border-radius:12px;background:#fff1f2;color:#be123c;font-size:12px;line-height:1.45}.hidden-input{display:none}@media(max-width:480px){.auth-page{padding:12px}.auth-card{padding:23px 18px;border-radius:22px}.auth-card h1{font-size:25px}}html.dark .auth-page{background:radial-gradient(circle at 15% 10%,#14284a 0,transparent 32%),#0b111a}html.dark .auth-card{background:#121923;border-color:#263242;box-shadow:0 28px 80px rgba(0,0,0,.4)}html.dark .auth-card h1{color:#f8fafc}html.dark .auth-subtitle{color:#98a2b3}html.dark .input-wrap{background:#0e151f;border-color:#2b3747}html.dark .input-wrap input{color:#f8fafc}html.dark .auth-divider:before,html.dark .auth-divider:after{background:#2b3747}`;
+
+const verificationStyles = `${baseStyles}.verification-card{max-width:520px!important}.verification-visual{height:150px;margin:-4px -4px 22px;border-radius:22px;background:linear-gradient(135deg,#eef5ff,#f7f9ff);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}.verification-visual:before,.verification-visual:after{content:"";position:absolute;border-radius:999px;background:rgba(37,99,235,.08);animation:verifyPulse 3s ease-in-out infinite}.verification-visual:before{width:180px;height:180px}.verification-visual:after{width:250px;height:250px;animation-delay:1s}.verify-scene{position:relative;z-index:2;width:220px;height:110px}.verify-mail{position:absolute;left:35px;top:28px;width:82px;height:60px;border-radius:14px;background:#fff;border:1px solid #dce7f8;box-shadow:0 14px 28px rgba(37,99,235,.16);display:grid;place-items:center;color:#2563eb;animation:mailFloat 2.8s ease-in-out infinite}.verify-arrow{position:absolute;left:115px;top:50px;width:55px;height:2px;background:#8db0f5;animation:arrowGlow 1.8s ease-in-out infinite}.verify-arrow:after{content:"";position:absolute;right:0;top:-4px;width:9px;height:9px;border-top:2px solid #2563eb;border-right:2px solid #2563eb;transform:rotate(45deg)}.verify-inbox{position:absolute;right:12px;top:23px;width:72px;height:70px;border-radius:16px;background:#eaf1ff;border:1px solid #cfe0ff;display:grid;place-items:center;color:#2563eb;animation:inboxGlow 2.8s ease-in-out infinite}.verify-check{position:absolute;right:0;bottom:8px;width:30px;height:30px;border-radius:50%;background:#22c55e;color:#fff;display:grid;place-items:center;border:3px solid #fff;box-shadow:0 6px 15px rgba(34,197,94,.28);animation:checkPop 2.8s ease-in-out infinite}@keyframes mailFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}@keyframes inboxGlow{0%,100%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 28px rgba(37,99,235,.18)}}@keyframes arrowGlow{0%,100%{opacity:.45;width:45px}50%{opacity:1;width:58px}}@keyframes checkPop{0%,65%,100%{transform:scale(1)}72%{transform:scale(1.16)}}@keyframes verifyPulse{0%,100%{transform:scale(.85);opacity:.45}50%{transform:scale(1.08);opacity:.9}}.verification-badge{width:max-content;margin:0 auto 12px;padding:7px 11px;border-radius:999px;background:#edf7ef;color:#16803b;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}.verification-lead{max-width:420px;margin-left:auto;margin-right:auto}.verification-email-box{margin:18px 0;padding:15px 16px;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:15px;background:#f5f8ff;border:1px solid #dce7fb;color:#25324a;word-break:break-word}.verification-email-box strong{font-size:14px}.auto-check{display:flex;align-items:center;justify-content:center;gap:8px;color:#2563eb;font-size:12px;font-weight:800;margin:12px 0 18px}.live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12);animation:livePulse 1.6s infinite}@keyframes livePulse{50%{box-shadow:0 0 0 9px rgba(34,197,94,0)}}.verification-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 20px}.verification-step{padding:12px 8px;border:1px solid #e7ebf2;border-radius:14px;background:#fafbfd;text-align:center}.verification-step span{width:26px;height:26px;margin:0 auto 7px;display:grid;place-items:center;border-radius:50%;background:#e8f0ff;color:#2563eb;font-size:12px;font-weight:900}.verification-step p{font-size:11px;line-height:1.35;color:#667085;margin:0}.verification-resend-box{margin-top:15px;padding:15px;border-radius:16px;background:linear-gradient(135deg,#f8faff,#f3f7ff);border:1px solid #e0e8f8;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left}.verification-resend-copy{display:flex;flex-direction:column;gap:4px;min-width:0}.verification-resend-copy strong{font-size:13px}.verification-resend-copy span{font-size:11px;color:#7b8798;line-height:1.4}.verification-resend-button{flex:0 0 auto;min-height:40px;padding:0 13px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap}.verification-resend-button:disabled{opacity:.55}.change-email-link{margin:16px auto 4px;border:0;background:transparent;color:#2563eb;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px}.change-email-panel{margin:12px 0 4px;padding:14px;border-radius:15px;background:#f8fafc;border:1px solid #e2e8f0;text-align:left}.change-email-panel label{display:block;margin-bottom:7px;font-size:12px;font-weight:800}.change-email-panel input{width:100%;box-sizing:border-box;height:44px;border:1px solid #dfe4ec;border-radius:11px;padding:0 12px;outline:0}.change-actions{display:flex;gap:8px;margin-top:10px}.change-actions button{flex:1;height:40px;border:0;border-radius:10px;font-size:12px;font-weight:800}.change-actions button:first-child{background:#eef2f6;color:#475467}.change-actions button:last-child{background:#2563eb;color:#fff}.auth-back-button{margin-top:8px;display:flex;justify-content:center;align-items:center;gap:6px}@media(max-width:480px){.verification-resend-box{align-items:stretch}.verification-resend-button{padding:0 10px}.verification-step{padding:10px 5px}}html.dark .verification-visual{background:linear-gradient(135deg,#13233d,#17202d)}html.dark .verification-card .verification-email-box,html.dark .change-email-panel{background:#0e151f;border-color:#2b3747;color:#e5e7eb}html.dark .verification-step{background:#101821;border-color:#293647}html.dark .verification-resend-box{background:#101a29;border-color:#293b55}html.dark .verification-step p,html.dark .verification-resend-copy span{color:#98a2b3}`;
+
+const profileStyles = `${baseStyles}.profile-setup-card{max-width:500px!important;text-align:center}.profile-setup-top{display:flex;align-items:center;justify-content:center;gap:8px;color:#2563eb;font-size:12px;font-weight:850;margin-bottom:12px}.profile-sparkle{width:38px;height:38px;border-radius:12px;background:#edf3ff;display:grid;place-items:center}.profile-setup-card h1{font-size:28px}.profile-preview{height:220px;border-radius:22px;margin:22px 0 18px;background:linear-gradient(135deg,#dbe7ff,#f2f5fb);background-size:cover;background-position:center;position:relative;overflow:hidden;border:1px solid #e1e7f0}.profile-preview:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(15,23,42,.58));pointer-events:none}.cover-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#6b7a90;font-size:12px;font-weight:800}.avatar-wrap{position:absolute;z-index:3;left:50%;bottom:31px;transform:translateX(-50%)}.avatar-preview{width:92px;height:92px;border-radius:50%;background:#fff;border:5px solid #fff;box-shadow:0 10px 28px rgba(15,23,42,.2);display:grid;place-items:center;overflow:hidden;color:#98a2b3}.avatar-preview img{width:100%;height:100%;object-fit:cover}.avatar-edit{position:absolute;right:-2px;bottom:2px;width:31px;height:31px;border:3px solid #fff;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center}.profile-name-preview{position:absolute;z-index:3;bottom:9px;left:0;right:0;color:#fff;font-size:13px;font-weight:850}.remove-cover{position:absolute;z-index:4;right:10px;top:10px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(15,23,42,.58);color:#fff;display:grid;place-items:center}.photo-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}.photo-option{position:relative;border:1px solid #e1e7ef;background:#fafbfd;border-radius:15px;padding:14px 12px;display:flex;flex-direction:column;gap:4px}.photo-option>span{width:34px;height:34px;border-radius:10px;background:#edf3ff;color:#2563eb;display:grid;place-items:center;margin-bottom:4px}.photo-option strong{font-size:12px;color:#243044}.photo-option small{font-size:10px;color:#7b8798;line-height:1.4}.selected-check{position:absolute;right:10px;top:10px;color:#22a05a}.profile-finish{margin-top:18px}.profile-note{display:flex;align-items:center;justify-content:center;gap:5px;color:#8490a1;font-size:10px;margin:12px 0 0}.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:480px){.profile-preview{height:205px}.photo-options{grid-template-columns:1fr}.profile-setup-card h1{font-size:25px}}html.dark .profile-sparkle{background:#162847}html.dark .profile-preview{background:linear-gradient(135deg,#1c3152,#202b3a)}html.dark .photo-option{background:#101821;border-color:#293647}html.dark .photo-option strong{color:#e5e7eb}html.dark .profile-note{color:#8793a5}`;
