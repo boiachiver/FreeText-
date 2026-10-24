@@ -3,42 +3,114 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Boi Achiver AI — intelligent chat with Internet browsing." />
+  <meta name="description" content="Boi Achiver AI — private local AI assistant." />
   <title>Boi Achiver AI</title>
   <style>
     :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f6f8}
     *{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;min-height:100vh;display:flex;flex-direction:column}
-    .top{padding:18px 16px;border-bottom:1px solid #ddd;background:#fff;position:sticky;top:0;z-index:2}.brand{font-size:22px;font-weight:800}.sub{font-size:13px;color:#667;margin-top:4px}
-    .chat{flex:1;padding:18px 14px 125px}.msg{max-width:84%;padding:12px 14px;border-radius:18px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.user{margin-left:auto;background:#111;color:#fff;border-bottom-right-radius:5px}.ai{background:#fff;border:1px solid #ddd;border-bottom-left-radius:5px}.sources{font-size:12px;margin-top:10px;padding-top:8px;border-top:1px solid #eee}.sources strong{display:block;margin-bottom:4px}.sources a{display:block;color:#2457d6;text-decoration:none;margin:5px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .composer{position:fixed;bottom:0;left:0;right:0;padding:10px;background:rgba(245,246,248,.97);border-top:1px solid #ddd}.box{max-width:900px;margin:auto;display:flex;gap:8px}.box textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:18px;padding:12px;font:inherit;min-height:48px;outline:none}.box button{border:0;border-radius:18px;padding:0 18px;background:#111;color:#fff;font-weight:700}.box button:disabled{opacity:.55}.tools{max-width:900px;margin:7px auto 0;font-size:12px;color:#555}.tools label{display:inline-flex;align-items:center;gap:6px}.empty{text-align:center;color:#777;padding-top:25vh}
+    .top{padding:18px 16px;border-bottom:1px solid #ddd;background:#fff;position:sticky;top:0;z-index:2}.brand{font-size:22px;font-weight:800}.sub{font-size:13px;color:#667;margin-top:4px}.status{margin-top:9px;font-size:12px;color:#667}.status.ready{color:#16733a}.status.error{color:#b42318}
+    .chat{flex:1;padding:18px 14px 125px}.msg{max-width:84%;padding:12px 14px;border-radius:18px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.user{margin-left:auto;background:#111;color:#fff;border-bottom-right-radius:5px}.ai{background:#fff;border:1px solid #ddd;border-bottom-left-radius:5px}.empty{text-align:center;color:#777;padding-top:25vh}
+    .composer{position:fixed;bottom:0;left:0;right:0;padding:10px;background:rgba(245,246,248,.97);border-top:1px solid #ddd}.box{max-width:900px;margin:auto;display:flex;gap:8px}.box textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:18px;padding:12px;font:inherit;min-height:48px;outline:none}.box button{border:0;border-radius:18px;padding:0 18px;background:#111;color:#fff;font-weight:700}.box button:disabled{opacity:.55}.tools{max-width:900px;margin:7px auto 0;font-size:12px;color:#555}.privacy{font-size:11px;color:#777;margin-top:5px}
     @media(max-width:600px){.msg{max-width:94%}}
   </style>
 </head>
 <body>
 <main>
-  <header class="top"><div class="brand">🤖 Boi Achiver AI</div><div class="sub">Smart assistant • Web browsing • Research • Writing • Coding</div></header>
-  <section id="chat" class="chat"><div class="empty" id="empty">Ask me anything.<br/>Turn on Internet browsing for current information.</div></section>
+  <header class="top">
+    <div class="brand">🤖 Boi Achiver AI</div>
+    <div class="sub">Private local AI • No OpenAI API key • Runs on your device</div>
+    <div id="status" class="status">Loading the local AI model…</div>
+  </header>
+  <section id="chat" class="chat"><div class="empty" id="empty">Boi Achiver AI is starting…<br/>The first model download can take a while.</div></section>
   <form class="composer" id="form">
-    <div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1"></textarea><button id="send">Send</button></div>
-    <div class="tools"><label><input id="web" type="checkbox" checked /> Browse the Internet</label></div>
+    <div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1" disabled></textarea><button id="send" disabled>Loading…</button></div>
+    <div class="tools"><span>🔒 Your conversation is processed locally after the model loads.</span><div class="privacy">No OpenAI key is used. No request is sent to /api/ai.</div></div>
   </form>
 </main>
-<script>
-  const chat=document.querySelector("#chat"),empty=document.querySelector("#empty"),input=document.querySelector("#input"),form=document.querySelector("#form"),web=document.querySelector("#web"),send=document.querySelector("#send");
+<script type="module">
+  import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+
+  const chat=document.querySelector("#chat");
+  const empty=document.querySelector("#empty");
+  const input=document.querySelector("#input");
+  const form=document.querySelector("#form");
+  const send=document.querySelector("#send");
+  const status=document.querySelector("#status");
   const history=[];
-  function add(text,who,sources=[]){
+  let generator=null;
+
+  function add(text,who){
     if(empty) empty.remove();
-    const d=document.createElement("div"); d.className="msg "+who; d.textContent=text;
-    if(sources.length){const s=document.createElement("div");s.className="sources";const title=document.createElement("strong");title.textContent="Sources";s.appendChild(title);sources.forEach(x=>{const a=document.createElement("a");a.href=x.url||x.link||"#";a.target="_blank";a.rel="noreferrer";a.textContent=x.title||x.url||x.link||"Web source";s.appendChild(a)});d.appendChild(s)}
-    chat.appendChild(d); window.scrollTo(0,document.body.scrollHeight);
+    const d=document.createElement("div");
+    d.className="msg "+who;
+    d.textContent=text;
+    chat.appendChild(d);
+    window.scrollTo(0,document.body.scrollHeight);
   }
+
+  function setStatus(text,type=""){
+    status.textContent=text;
+    status.className="status "+type;
+  }
+
+  async function loadModel(){
+    try{
+      setStatus("Downloading the local AI model… This happens only when the browser needs the model.");
+      const useWebGPU=!!navigator.gpu;
+      generator=await pipeline("text-generation","Xenova/Qwen2.5-0.5B-Instruct",{
+        device:useWebGPU?"webgpu":"wasm",
+        dtype:useWebGPU?"q4f16":"q4"
+      });
+      setStatus(useWebGPU?"Boi Achiver AI is ready • WebGPU local mode":"Boi Achiver AI is ready • local WASM mode","ready");
+      input.disabled=false;
+      send.disabled=false;
+      send.textContent="Send";
+      input.focus();
+      if(empty) empty.innerHTML="Boi Achiver AI is ready.<br/>Ask me anything — no API key required.";
+    }catch(error){
+      console.error(error);
+      setStatus("The local AI model could not start.","error");
+      if(empty) empty.innerHTML="I couldn't start the local AI model.<br/>Try a browser with WebGPU support, then reload the page.";
+      send.textContent="Unavailable";
+    }
+  }
+
   form.addEventListener("submit",async event=>{
-    event.preventDefault(); const text=input.value.trim(); if(!text)return; input.value=""; add(text,"user"); history.push({role:"user",content:text}); send.disabled=true; send.textContent="…";
-    try{const response=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history,webSearch:web.checked})});const data=await response.json();if(!response.ok)throw new Error(data.error||"AI request failed");add(data.text||"I could not generate a response.","ai",data.sources||[]);history.push({role:"assistant",content:data.text||""});}
-    catch(error){add("Sorry, Boi Achiver AI could not connect: "+(error.message||"Unknown error"),"ai");}
-    finally{send.disabled=false;send.textContent="Send";input.focus();}
+    event.preventDefault();
+    const text=input.value.trim();
+    if(!text||!generator)return;
+    input.value="";
+    add(text,"user");
+    history.push({role:"user",content:text});
+    send.disabled=true;
+    send.textContent="Thinking…";
+    try{
+      const recent=history.slice(-8);
+      const prompt=[
+        {role:"system",content:"You are Boi Achiver AI inside FreeText. Be helpful, friendly, honest and concise. Do not claim to have internet access or live information. If you do not know something, say so."},
+        ...recent
+      ];
+      const result=await generator(prompt,{max_new_tokens:256,do_sample:true,temperature:0.7,top_p:0.9,return_full_text:false});
+      const answer=Array.isArray(result)?(result[0]?.generated_text||""):"";
+      const clean=typeof answer==="string"?answer.trim():"";
+      const finalText=clean||"I couldn't generate a response. Please try again.";
+      add(finalText,"ai");
+      history.push({role:"assistant",content:finalText});
+    }catch(error){
+      console.error(error);
+      add("I had trouble thinking locally. Please try again.","ai");
+    }finally{
+      send.disabled=false;
+      send.textContent="Send";
+      input.focus();
+    }
   });
-  input.addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit();}});
+
+  input.addEventListener("keydown",event=>{
+    if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit();}
+  });
+
+  loadModel();
 </script>
 </body>
 </html>
