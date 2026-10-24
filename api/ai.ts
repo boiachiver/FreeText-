@@ -58,7 +58,11 @@ function extractInteraction(data: any) {
 }
 
 async function callGemini(messages: ChatMessage[], webSearch: boolean, context: any) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  // Accept the existing Vercel variable name as well as the conventional uppercase name.
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.Gemini_API_Key ||
+    process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
 
   const transcript = messages
@@ -149,7 +153,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "Please send a message." });
     }
 
-    // Primary provider: Google's current Interactions API with optional live Google Search.
+    // Primary provider: Google Gemini Interactions API with optional live Google Search.
     const gemini = await callGemini(input, Boolean(webSearch), context);
     if (gemini) return res.status(200).json(gemini);
 
