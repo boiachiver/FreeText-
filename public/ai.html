@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Boi Achiver AI — intelligent chat with Internet browsing." />
+  <title>Boi Achiver AI</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f6f8}
+    *{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;min-height:100vh;display:flex;flex-direction:column}
+    .top{padding:18px 16px;border-bottom:1px solid #ddd;background:#fff;position:sticky;top:0;z-index:2}.brand{font-size:22px;font-weight:800}.sub{font-size:13px;color:#667;margin-top:4px}
+    .chat{flex:1;padding:18px 14px 125px}.msg{max-width:84%;padding:12px 14px;border-radius:18px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.user{margin-left:auto;background:#111;color:#fff;border-bottom-right-radius:5px}.ai{background:#fff;border:1px solid #ddd;border-bottom-left-radius:5px}.sources{font-size:12px;margin-top:10px;padding-top:8px;border-top:1px solid #eee}.sources strong{display:block;margin-bottom:4px}.sources a{display:block;color:#2457d6;text-decoration:none;margin:5px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .composer{position:fixed;bottom:0;left:0;right:0;padding:10px;background:rgba(245,246,248,.97);border-top:1px solid #ddd}.box{max-width:900px;margin:auto;display:flex;gap:8px}.box textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:18px;padding:12px;font:inherit;min-height:48px;outline:none}.box button{border:0;border-radius:18px;padding:0 18px;background:#111;color:#fff;font-weight:700}.box button:disabled{opacity:.55}.tools{max-width:900px;margin:7px auto 0;font-size:12px;color:#555}.tools label{display:inline-flex;align-items:center;gap:6px}.empty{text-align:center;color:#777;padding-top:25vh}
+    @media(max-width:600px){.msg{max-width:94%}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="top"><div class="brand">🤖 Boi Achiver AI</div><div class="sub">Smart assistant • Web browsing • Research • Writing • Coding</div></header>
+  <section id="chat" class="chat"><div class="empty" id="empty">Ask me anything.<br/>Turn on Internet browsing for current information.</div></section>
+  <form class="composer" id="form">
+    <div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1"></textarea><button id="send">Send</button></div>
+    <div class="tools"><label><input id="web" type="checkbox" checked /> Browse the Internet</label></div>
+  </form>
+</main>
+<script>
+  const chat=document.querySelector("#chat"),empty=document.querySelector("#empty"),input=document.querySelector("#input"),form=document.querySelector("#form"),web=document.querySelector("#web"),send=document.querySelector("#send");
+  const history=[];
+  function add(text,who,sources=[]){
+    if(empty) empty.remove();
+    const d=document.createElement("div"); d.className="msg "+who; d.textContent=text;
+    if(sources.length){const s=document.createElement("div");s.className="sources";const title=document.createElement("strong");title.textContent="Sources";s.appendChild(title);sources.forEach(x=>{const a=document.createElement("a");a.href=x.url||x.link||"#";a.target="_blank";a.rel="noreferrer";a.textContent=x.title||x.url||x.link||"Web source";s.appendChild(a)});d.appendChild(s)}
+    chat.appendChild(d); window.scrollTo(0,document.body.scrollHeight);
+  }
+  form.addEventListener("submit",async event=>{
+    event.preventDefault(); const text=input.value.trim(); if(!text)return; input.value=""; add(text,"user"); history.push({role:"user",content:text}); send.disabled=true; send.textContent="…";
+    try{const response=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history,webSearch:web.checked})});const data=await response.json();if(!response.ok)throw new Error(data.error||"AI request failed");add(data.text||"I could not generate a response.","ai",data.sources||[]);history.push({role:"assistant",content:data.text||""});}
+    catch(error){add("Sorry, Boi Achiver AI could not connect: "+(error.message||"Unknown error"),"ai");}
+    finally{send.disabled=false;send.textContent="Send";input.focus();}
+  });
+  input.addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit();}});
+</script>
+</body>
+</html>
