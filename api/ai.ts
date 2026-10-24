@@ -15,8 +15,9 @@ function buildInput(messages: any[]): ChatMessage[] {
 function buildSystem(context: any) {
   const safeContext = context && typeof context === "object" ? context : null;
   return [
-    "You are Boi Achiver AI, the online AI assistant inside FreeText.",
-    "Be helpful, accurate, friendly, practical, and beginner-friendly.",
+    "You are Boi Achiver AI, the official AI DM/chat assistant inside FreeText.",
+    "Be helpful, accurate, friendly, practical, concise when appropriate, and beginner-friendly.",
+    "You are a conversational assistant, so remember the conversation supplied in the current request and answer naturally like a direct message chat.",
     "When web search is enabled, use current web information for news, current events, prices, sports, weather, recent technology releases, and other information that can change.",
     "Never invent search results, citations, sources, dates, or facts.",
     "Clearly distinguish current web information from general knowledge when useful.",
@@ -29,18 +30,25 @@ function buildSystem(context: any) {
   ].join("\n\n");
 }
 
-function extractGeminiResponse(data: any) {
-  const text = (data?.candidates || [])
-    .flatMap((candidate: any) => candidate?.content?.parts || [])
-    .map((part: any) => part?.text || "")
+function extractInteraction(data: any) {
+  const steps = Array.isArray(data?.steps) ? data.steps : [];
+  const text = steps
+    .filter((step: any) => step?.type === "model_output")
+    .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
+    .filter((item: any) => item?.type === "text" && typeof item?.text === "string")
+    .map((item: any) => item.text)
     .join("\n")
     .trim();
 
-  const sources = (data?.candidates || [])
-    .flatMap((candidate: any) => candidate?.groundingMetadata?.groundingChunks || [])
-    .map((chunk: any) => chunk?.web)
-    .filter((web: any) => web && typeof web.uri === "string")
-    .map((web: any) => ({ title: web.title || "Web source", url: web.uri }))
+  const sources = steps
+    .filter((step: any) => step?.type === "model_output")
+    .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
+    .flatMap((item: any) => Array.isArray(item?.annotations) ? item.annotations : [])
+    .map((annotation: any) => ({
+      title: annotation?.title || "Web source",
+      url: annotation?.uri,
+    }))
+    .filter((source: any) => typeof source.url === "string" && source.url.length > 0)
     .filter((source: any, index: number, all: any[]) =>
       all.findIndex((item: any) => item.url === source.url) === index
     )
@@ -53,23 +61,28 @@ async function callGemini(messages: ChatMessage[], webSearch: boolean, context: 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
 
-  const contents = messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
+  const transcript = messages
+    .map((message) => `${message.role === "assistant" ? "Boi Achiver AI" : "User"}: ${message.content}`)
+    .join("\n\n");
+
+  const input = `${buildSystem(context)}\n\nCURRENT AI DM CONVERSATION:\n${transcript}`;
 
   const body: any = {
-    systemInstruction: { parts: [{ text: buildSystem(context) }] },
-    contents,
-    generationConfig: { temperature: 0.4, maxOutputTokens: 1000 },
+    model: "gemini-flash-latest",
+    input,
+    generation_config: {
+      max_output_tokens: 1200,
+      thinking_level: "low",
+    },
+    store: false,
   };
 
   if (webSearch) {
-    body.tools = [{ google_search: {} }];
+    body.tools = [{ type: "google_search" }];
   }
 
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
       headers: {
@@ -85,9 +98,14 @@ async function callGemini(messages: ChatMessage[], webSearch: boolean, context: 
     throw new Error(data?.error?.message || `Gemini request failed (${response.status})`);
   }
 
-  const result = extractGeminiResponse(data);
+  const result = extractInteraction(data);
   if (!result.text) throw new Error("Gemini returned an empty response.");
-  return { ...result, online: true, provider: "Google Gemini" };
+  return {
+    ...result,
+    online: true,
+    provider: "Google Gemini Interactions",
+    model: data?.model || "gemini-flash-latest",
+  };
 }
 
 async function callGateway(messages: ChatMessage[], webSearch: boolean, context: any) {
@@ -131,12 +149,11 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "Please send a message." });
     }
 
-    // First choice: direct Gemini API. This avoids Vercel AI Gateway billing/card requirements
-    // while still providing server-side AI plus Google's managed realtime web search.
+    // Primary provider: Google's current Interactions API with optional live Google Search.
     const gemini = await callGemini(input, Boolean(webSearch), context);
     if (gemini) return res.status(200).json(gemini);
 
-    // Second choice: Vercel AI Gateway when the project has Gateway access/credits.
+    // Fallback provider if Gemini is not configured.
     try {
       const gatewayResult = await callGateway(input, Boolean(webSearch), context);
       return res.status(200).json(gatewayResult);
@@ -146,7 +163,7 @@ export default async function handler(req: any, res: any) {
         online: false,
         setupRequired: true,
         error:
-          "Online AI needs a server AI provider. Add GEMINI_API_KEY to Vercel for the no-card Google Gemini + live Google Search mode, or add a valid Vercel AI Gateway payment method.",
+          "Online AI needs a server AI provider. Add GEMINI_API_KEY to Vercel Production for Google Gemini + live Google Search, or configure Vercel AI Gateway.",
         details: gatewayError?.message || "AI Gateway request failed",
       });
     }
