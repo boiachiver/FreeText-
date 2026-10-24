@@ -46,11 +46,18 @@ function buildPrompt(messages: ChatMessage[], context: any) {
 
 async function runOpenModel(messages: ChatMessage[], context: any): Promise<AIResult> {
   const prompt = buildPrompt(messages, context);
+  const hfToken = process.env.HF_TOKEN;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (hfToken) headers.Authorization = `Bearer ${hfToken}`;
+
+  // Hugging Face retired the legacy api-inference.huggingface.co hostname.
+  // Use the current router endpoint. HF_TOKEN is optional in code, but
+  // Hugging Face may require it for hosted inference depending on access/quota.
   const response = await fetch(
-    "https://api-inference.huggingface.co/models/HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    "https://router.huggingface.co/hf-inference/models/HuggingFaceTB/SmolLM2-1.7B-Instruct",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         inputs: prompt,
         parameters: {
@@ -65,7 +72,14 @@ async function runOpenModel(messages: ChatMessage[], context: any): Promise<AIRe
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.error || `Online AI request failed (${response.status})`);
+    const detail = String(data?.error || data?.message || `HTTP ${response.status}`);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Hugging Face requires inference access for this model. Configure HF_TOKEN in Vercel Environment Variables, then redeploy.");
+    }
+    if (response.status === 429) {
+      throw new Error("The free inference service is busy or rate-limited. Please try again shortly.");
+    }
+    throw new Error(`Hugging Face inference failed: ${detail.slice(0, 240)}`);
   }
 
   const generated = Array.isArray(data)
@@ -102,9 +116,11 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json(result);
   } catch (error: any) {
     console.error("Boi Achiver AI online model error:", error);
-    return res.status(502).json({
+    const message = String(error?.message || "");
+    const status = /requires inference access/i.test(message) ? 503 : 502;
+    return res.status(status).json({
       online: false,
-      error: "Boi Achiver AI is temporarily unavailable. Please try again.",
+      error: message || "Boi Achiver AI is temporarily unavailable. Please try again.",
     });
   }
 }
