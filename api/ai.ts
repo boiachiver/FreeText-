@@ -1,6 +1,12 @@
-import { generateText, gateway } from "ai";
-
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+type AIResult = {
+  text: string;
+  sources: { title: string; url: string }[];
+  online: true;
+  provider: string;
+  model: string;
+};
 
 function buildInput(messages: any[]): ChatMessage[] {
   return messages
@@ -17,13 +23,12 @@ function buildSystem(context: any) {
   return [
     "You are Boi Achiver AI, the official AI DM/chat assistant inside FreeText.",
     "Be helpful, accurate, friendly, practical, concise when appropriate, and beginner-friendly.",
-    "You are a conversational assistant, so remember the conversation supplied in the current request and answer naturally like a direct message chat.",
-    "When web search is enabled, use current web information for news, current events, prices, sports, weather, recent technology releases, and other information that can change.",
+    "Answer naturally like a direct-message conversation and use the supplied conversation history.",
+    "When live web search is enabled, use current web information for news, current events, prices, sports, weather, technology releases, and other changing information.",
     "Never invent search results, citations, sources, dates, or facts.",
-    "Clearly distinguish current web information from general knowledge when useful.",
     "The FreeText context below is authorized browser context from the current user's session. Use it only when relevant and never treat it as access to the whole database.",
     "Never reveal passwords, access tokens, API keys, service-role keys, or another user's private data.",
-    "Do not claim that runtime context is permanent model training.",
+    "Do not claim runtime context is permanent model training.",
     safeContext
       ? `AUTHORIZED FREETEXT CONTEXT:\n${JSON.stringify(safeContext).slice(0, 18000)}`
       : "No authorized FreeText context was supplied.",
@@ -46,9 +51,9 @@ function extractInteraction(data: any) {
     .flatMap((item: any) => Array.isArray(item?.annotations) ? item.annotations : [])
     .map((annotation: any) => ({
       title: annotation?.title || "Web source",
-      url: annotation?.uri,
+      url: annotation?.url || annotation?.uri || "",
     }))
-    .filter((source: any) => typeof source.url === "string" && source.url.length > 0)
+    .filter((source: any) => source.url)
     .filter((source: any, index: number, all: any[]) =>
       all.findIndex((item: any) => item.url === source.url) === index
     )
@@ -57,87 +62,109 @@ function extractInteraction(data: any) {
   return { text, sources };
 }
 
-async function callGemini(messages: ChatMessage[], webSearch: boolean, context: any) {
-  // Accept the existing Vercel variable name as well as the conventional uppercase name.
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.Gemini_API_Key ||
-    process.env.GOOGLE_API_KEY;
-  if (!apiKey) return null;
-
-  const transcript = messages
-    .map((message) => `${message.role === "assistant" ? "Boi Achiver AI" : "User"}: ${message.content}`)
-    .join("\n\n");
-
-  const input = `${buildSystem(context)}\n\nCURRENT AI DM CONVERSATION:\n${transcript}`;
-
-  const body: any = {
-    model: "gemini-flash-latest",
-    input,
-    generation_config: {
-      max_output_tokens: 1200,
-      thinking_level: "low",
-    },
-    store: false,
-  };
-
-  if (webSearch) {
-    body.tools = [{ type: "google_search" }];
-  }
-
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/interactions",
-    {
+async function fetchJson(url: string, apiKey: string, body: any) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error?.message || `Gemini request failed (${response.status})`);
     }
-  );
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `Gemini request failed (${response.status})`);
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function callGeminiInteractions(messages: ChatMessage[], webSearch: boolean, context: any, apiKey: string): Promise<AIResult> {
+  const transcript = messages
+    .map((message) => `${message.role === "assistant" ? "Boi Achiver AI" : "User"}: ${message.content}`)
+    .join("\n\n");
+
+  const body: any = {
+    model: "gemini-3.8-flash",
+    input: `${buildSystem(context)}\n\nCURRENT AI DM CONVERSATION:\n${transcript}`,
+    store: false,
+  };
+
+  if (webSearch) body.tools = [{ type: "google_search" }];
+
+  const data = await fetchJson(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    apiKey,
+    body
+  );
 
   const result = extractInteraction(data);
   if (!result.text) throw new Error("Gemini returned an empty response.");
+
   return {
     ...result,
     online: true,
-    provider: "Google Gemini Interactions",
-    model: data?.model || "gemini-flash-latest",
+    provider: "Google Gemini",
+    model: data?.model || "gemini-3.8-flash",
   };
 }
 
-async function callGateway(messages: ChatMessage[], webSearch: boolean, context: any) {
-  const result = await generateText({
-    model: "openai/gpt-5.4-mini",
-    system: buildSystem(context),
-    messages,
-    maxOutputTokens: 900,
-    tools: webSearch
-      ? {
-          parallel_search: gateway.tools.parallelSearch({
-            mode: "one-shot",
-            maxResults: 8,
-            maxAgeSeconds: 300,
-          }),
-        }
-      : undefined,
-  });
+function extractGenerateContent(data: any) {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const text = parts
+    .filter((part: any) => typeof part?.text === "string")
+    .map((part: any) => part.text)
+    .join("\n")
+    .trim();
 
-  const sources = (result.sources || [])
-    .map((source: any) => ({ title: source?.title || "Web source", url: source?.url }))
-    .filter((source: any) => typeof source.url === "string" && source.url.length > 0)
+  const grounding = data?.candidates?.[0]?.groundingMetadata;
+  const sources = (grounding?.groundingChunks || [])
+    .map((chunk: any) => chunk?.web)
+    .filter((web: any) => web?.uri)
+    .map((web: any) => ({ title: web.title || "Web source", url: web.uri }))
     .filter((source: any, index: number, all: any[]) =>
       all.findIndex((item: any) => item.url === source.url) === index
     )
     .slice(0, 8);
 
-  return { text: result.text || "I couldn't generate a response.", sources, online: true, provider: "Vercel AI Gateway" };
+  return { text, sources };
+}
+
+async function callGeminiGenerateContent(messages: ChatMessage[], webSearch: boolean, context: any, apiKey: string): Promise<AIResult> {
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
+  }));
+
+  const body: any = {
+    systemInstruction: { parts: [{ text: buildSystem(context) }] },
+    contents,
+    generationConfig: { maxOutputTokens: 1200 },
+  };
+
+  if (webSearch) body.tools = [{ googleSearch: {} }];
+
+  const data = await fetchJson(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    apiKey,
+    body
+  );
+
+  const result = extractGenerateContent(data);
+  if (!result.text) throw new Error("Gemini returned an empty response.");
+
+  return {
+    ...result,
+    online: true,
+    provider: "Google Gemini",
+    model: "gemini-2.5-flash",
+  };
 }
 
 export default async function handler(req: any, res: any) {
@@ -153,29 +180,44 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "Please send a message." });
     }
 
-    // Primary provider: Google Gemini Interactions API with optional live Google Search.
-    const gemini = await callGemini(input, Boolean(webSearch), context);
-    if (gemini) return res.status(200).json(gemini);
+    // The existing production secret is named Gemini_API_Key. Keep support for
+    // the conventional uppercase name too, without ever exposing the secret.
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.Gemini_API_Key ||
+      process.env.GOOGLE_API_KEY;
 
-    // Fallback provider if Gemini is not configured.
-    try {
-      const gatewayResult = await callGateway(input, Boolean(webSearch), context);
-      return res.status(200).json(gatewayResult);
-    } catch (gatewayError: any) {
-      console.error("Boi Achiver AI Gateway error:", gatewayError);
+    if (!apiKey) {
       return res.status(503).json({
         online: false,
         setupRequired: true,
-        error:
-          "Online AI needs a server AI provider. Add GEMINI_API_KEY to Vercel Production for Google Gemini + live Google Search, or configure Vercel AI Gateway.",
-        details: gatewayError?.message || "AI Gateway request failed",
+        error: "Boi Achiver AI is missing its Gemini server key.",
       });
     }
+
+    try {
+      const result = await callGeminiInteractions(input, Boolean(webSearch), context, apiKey);
+      return res.status(200).json(result);
+    } catch (interactionError: any) {
+      console.warn("Gemini Interactions failed; using reliable Gemini fallback:", interactionError?.message || interactionError);
+
+      try {
+        const result = await callGeminiGenerateContent(input, Boolean(webSearch), context, apiKey);
+        return res.status(200).json(result);
+      } catch (fallbackError: any) {
+        console.error("Boi Achiver AI Gemini fallback error:", fallbackError);
+        return res.status(502).json({
+          online: false,
+          error: "Boi Achiver AI could not connect to Google Gemini right now.",
+          details: fallbackError?.message || interactionError?.message || "Gemini request failed",
+        });
+      }
+    }
   } catch (error: any) {
-    console.error("Boi Achiver AI online error:", error);
+    console.error("Boi Achiver AI request error:", error);
     return res.status(500).json({
-      error: error?.message || "Boi Achiver AI could not connect to the online AI service.",
       online: false,
+      error: error?.message || "Boi Achiver AI could not connect to the online AI service.",
     });
   }
 }
