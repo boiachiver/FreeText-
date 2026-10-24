@@ -1,278 +1,46 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Boi Achiver AI — private local AI assistant." />
-  <title>Boi Achiver AI</title>
-  <style>
-    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f6f8}
-    *{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;min-height:100vh;display:flex;flex-direction:column}
-    .top{padding:18px 16px;border-bottom:1px solid #ddd;background:#fff;position:sticky;top:0;z-index:2}.brand{font-size:22px;font-weight:800}.sub{font-size:13px;color:#667;margin-top:4px}.status{margin-top:9px;font-size:12px;color:#667}.status.ready{color:#16733a}.status.error{color:#b42318}
-    .context{margin-top:7px;font-size:11px;color:#555}.context.ready{color:#16733a}.context.empty{color:#8a5a00}
-    .chat{flex:1;padding:18px 14px 125px}.msg{max-width:84%;padding:12px 14px;border-radius:18px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.user{margin-left:auto;background:#111;color:#fff;border-bottom-right-radius:5px}.ai{background:#fff;border:1px solid #ddd;border-bottom-left-radius:5px}.empty{text-align:center;color:#777;padding-top:25vh}
-    .composer{position:fixed;bottom:0;left:0;right:0;padding:10px;background:rgba(245,246,248,.97);border-top:1px solid #ddd}.box{max-width:900px;margin:auto;display:flex;gap:8px}.box textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:18px;padding:12px;font:inherit;min-height:48px;outline:none}.box button{border:0;border-radius:18px;padding:0 18px;background:#111;color:#fff;font-weight:700}.box button:disabled{opacity:.55}.tools{max-width:900px;margin:7px auto 0;font-size:12px;color:#555}.privacy{font-size:11px;color:#777;margin-top:5px}
-    @media(max-width:600px){.msg{max-width:94%}}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="description" content="Boi Achiver AI — private local AI assistant." />
+<title>Boi Achiver AI</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f6f8}*{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;min-height:100vh;display:flex;flex-direction:column}.top{padding:18px 16px;border-bottom:1px solid #ddd;background:#fff;position:sticky;top:0;z-index:2}.brand{font-size:22px;font-weight:800}.sub{font-size:13px;color:#667;margin-top:4px}.status{margin-top:9px;font-size:12px;color:#667}.status.ready{color:#16733a}.status.error{color:#b42318}.context{margin-top:7px;font-size:11px;color:#555}.context.ready{color:#16733a}.context.empty{color:#8a5a00}.chat{flex:1;padding:18px 14px 125px}.msg{max-width:84%;padding:12px 14px;border-radius:18px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.user{margin-left:auto;background:#111;color:#fff;border-bottom-right-radius:5px}.ai{background:#fff;border:1px solid #ddd;border-bottom-left-radius:5px}.empty{text-align:center;color:#777;padding-top:25vh}.composer{position:fixed;bottom:0;left:0;right:0;padding:10px;background:rgba(245,246,248,.97);border-top:1px solid #ddd}.box{max-width:900px;margin:auto;display:flex;gap:8px}.box textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:18px;padding:12px;font:inherit;min-height:48px;outline:none}.box button{border:0;border-radius:18px;padding:0 18px;background:#111;color:#fff;font-weight:700}.box button:disabled{opacity:.55}.tools{max-width:900px;margin:7px auto 0;font-size:12px;color:#555}.privacy{font-size:11px;color:#777;margin-top:5px}@media(max-width:600px){.msg{max-width:94%}}
+</style>
 </head>
 <body>
 <main>
-  <header class="top">
-    <div class="brand">🤖 Boi Achiver AI</div>
-    <div class="sub">Private local AI • FreeText knowledge • No OpenAI API key</div>
-    <div id="status" class="status">Loading the local AI model…</div>
-    <div id="contextStatus" class="context empty">FreeText account context: waiting for the app…</div>
-  </header>
-  <section id="chat" class="chat"><div class="empty" id="empty">Boi Achiver AI is starting…<br/>Your local FreeText assistant is loading.</div></section>
-  <form class="composer" id="form">
-    <div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1" disabled></textarea><button id="send" disabled>Loading…</button></div>
-    <div class="tools"><span>🔒 Local AI • authorized FreeText context • local conversation memory</span><div class="privacy">No OpenAI key is used. Your FreeText context stays in this browser and is limited to data already loaded for your account.</div></div>
-  </form>
+<header class="top"><div class="brand">🤖 Boi Achiver AI</div><div class="sub">Private local AI • FreeText knowledge • No OpenAI API key</div><div id="status" class="status">Starting local AI…</div><div id="contextStatus" class="context empty">FreeText account context: waiting for the app…</div></header>
+<section id="chat" class="chat"><div class="empty" id="empty">Boi Achiver AI is starting…<br/>The local model is loading.</div></section>
+<form class="composer" id="form"><div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1" disabled></textarea><button id="send" disabled>Loading…</button></div><div class="tools"><span>🔒 Local AI • authorized FreeText context • local conversation memory</span><div class="privacy">No OpenAI key is used. Your FreeText context stays in this browser and is limited to data already loaded for your account.</div></div></form>
 </main>
 <script type="module">
-  import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
-
-  const chat=document.querySelector("#chat");
-  const empty=document.querySelector("#empty");
-  const input=document.querySelector("#input");
-  const form=document.querySelector("#form");
-  const send=document.querySelector("#send");
-  const status=document.querySelector("#status");
-  const contextStatus=document.querySelector("#contextStatus");
-  const MEMORY_KEY="boi_achiver_ai_memory_v1";
-  const CONTEXT_KEY="freetext_ai_context_v1";
-  const history=loadMemory();
-  let generator=null;
-
-  const freeTextKnowledge=`
-IDENTITY AND ROLE
-You are Boi Achiver AI, the built-in AI assistant for FreeText. You are an assistant inside the FreeText project, not a human and not the owner. Be friendly, practical, respectful, honest and beginner-friendly. When useful, call the user Boi Achiver.
-
-FREETEXT PROJECT
-FreeText is a social communication platform built with React, TypeScript, Vite and Supabase. The production app is deployed on Vercel and the source code is maintained in the FreeText GitHub repository.
-FreeText is designed to be mobile-first and usable from Android phones as well as larger screens.
-The project goal is to provide a private, modern social communication experience where people can create accounts, connect with others, share content and communicate.
-
-KNOWN FREETEXT FEATURES
-- User accounts and authentication.
-- User profiles and profile editing.
-- Global user/content search.
-- Following and social connections.
-- Posts and post creation.
-- Stories.
-- Comments and social interactions.
-- Notifications for relevant activity.
-- Direct/private chat and messaging UI.
-- File and media uploads.
-- Reports and moderation workflows.
-- User verification features.
-- Admin dashboard and administrative controls.
-- Ban and unban controls for moderation.
-- Post deletion/moderation tools.
-- Admin roles and audit logs.
-- Theme controls, including dark/light presentation.
-- Realtime capabilities through Supabase where implemented.
-- A built-in Boi Achiver AI page.
-
-CURRENT AI DESIGN
-Boi Achiver AI runs locally in the user's browser using the open-source Qwen2.5 0.5B Instruct model through Transformers.js.
-The AI does not require an OpenAI API key and does not send chat requests to /api/ai.
-The browser can use WebGPU when available and falls back to local WASM when WebGPU is unavailable.
-The model is small, so it may make mistakes, repeat itself, misunderstand complex requests or produce less detailed answers than a large cloud model.
-The AI has local conversation memory stored in the browser. This memory is not the same thing as permanent training of the model.
-
-AUTHORIZED FREETEXT CONTEXT
-The FreeText React app can provide Boi Achiver AI with a small, sanitized local context from data that has already been loaded for the currently authenticated user.
-This context can include the current user's basic profile, visible posts, notifications, active stories metadata and the messages currently loaded in the open conversation.
-This is runtime context, not permanent model training.
-Do not assume the AI can see every user, every private chat or every database row.
-Do not ask for or expose authentication tokens, passwords, service-role keys or other secrets.
-If the authorized context does not contain something, say that you do not have that information.
-
-WHAT KNOWLEDGE MEANS HERE
-This knowledge block gives the model project-specific instructions and facts at runtime. It is not the same as training a new neural network from scratch.
-When new FreeText features are confirmed, they can be added to this knowledge base so the assistant can explain them more accurately.
-Never claim that the model has permanently learned something merely because it was included in a conversation.
-Never invent database tables, permissions, features, users, posts, messages or technical details that are not known.
-
-FREETEXT TECHNICAL STACK
-Frontend: React + TypeScript + Vite.
-Backend/data platform: Supabase.
-Deployment: Vercel.
-Source control: GitHub.
-Local AI runtime: Transformers.js in the browser.
-Local model: Xenova/Qwen2.5-0.5B-Instruct.
-The Supabase client is used by the FreeText application for authenticated data and backend services where implemented.
-
-SECURITY AND PRIVACY RULES
-Treat private messages, private profiles, account credentials, authentication tokens and other private user data as sensitive.
-Do not reveal secrets, API keys, passwords, service-role keys or authentication tokens.
-Do not claim access to every FreeText user's private information.
-A local browser AI should only use data that the current authenticated user is authorized to receive through the application's security rules.
-Do not suggest bypassing Supabase Row Level Security or other access controls.
-Do not expose another user's private chat, account information or private content.
-If asked for private data that is not available in the current authorized context, explain that you cannot access it.
-
-CHAT AND SOCIAL FEATURES
-FreeText's chat area is intended for private communication between users. Messaging should respect authentication and database access rules.
-Posts and comments are social content and may have different visibility rules depending on the application's implementation.
-Notifications help users see relevant account and social activity.
-Stories are temporary-style social content and should not be described as permanent unless the actual implementation says so.
-Uploads may include images or other media; do not assume a specific file type, storage bucket or size limit unless it is known.
-
-ADMIN AND MODERATION
-The FreeText admin area is for authorized administrators. It includes management capabilities such as users/search/filtering, verification, ban/unban, post moderation, reports, roles and audit logs.
-Never tell a normal user that they can bypass admin permissions.
-Never invent an administrator's private data or claim that an action was performed unless the application actually performed it.
-
-CODING HELP
-The user may be a beginner and may work from an Android phone. Give simple, copyable steps and explain unfamiliar terms briefly.
-For FreeText coding requests, prefer the existing React/TypeScript/Vite/Supabase structure instead of inventing a completely different framework.
-When editing code, preserve existing functionality unless the user explicitly asks to remove it.
-For database changes, explain that Supabase schema and Row Level Security policies must match the code.
-For deployment changes, remember that GitHub main can trigger the Vercel deployment when the project is connected that way.
-Do not tell the user that a code change was deployed unless the deployment was actually verified.
-
-AI LIMITATIONS
-The local model does not automatically have live Internet access.
-The local model does not automatically know the latest FreeText database contents.
-The local model cannot safely see all users' private data.
-The local model can answer from this project knowledge, authorized local context and the current conversation, but it should be honest about uncertainty.
-If a question requires current information from the Internet, say that live browsing is not available in this local AI page rather than pretending to browse.
-If asked about an unlisted FreeText feature, say that there is not enough confirmed information and ask for the relevant code or describe what is known.
-
-PERSONALITY
-Be helpful, calm, encouraging and direct. Avoid unnecessary technical jargon. When giving steps, use numbered instructions. When providing code, make it complete enough for the user to copy and use. Do not pretend to have completed an action that you did not actually complete.
-`;
-
-  function loadMemory(){
-    try{
-      const saved=JSON.parse(localStorage.getItem(MEMORY_KEY)||"[]");
-      return Array.isArray(saved)?saved.filter(x=>x&&typeof x.content==="string"&&typeof x.role==="string").slice(-12):[];
-    }catch{return []}
-  }
-
-  function saveMemory(){
-    try{localStorage.setItem(MEMORY_KEY,JSON.stringify(history.slice(-12)));}catch{}
-  }
-
-  function loadAuthorizedContext(){
-    try{
-      const value=JSON.parse(localStorage.getItem(CONTEXT_KEY)||"null");
-      if(!value||typeof value!=="object"){
-        contextStatus.textContent="FreeText account context: not available yet";
-        contextStatus.className="context empty";
-        return null;
-      }
-      const summary=[];
-      if(value.profile) summary.push("profile");
-      if(Array.isArray(value.posts)&&value.posts.length) summary.push(`${value.posts.length} posts`);
-      if(Array.isArray(value.notifications)&&value.notifications.length) summary.push(`${value.notifications.length} notifications`);
-      if(Array.isArray(value.stories)&&value.stories.length) summary.push(`${value.stories.length} stories`);
-      if(Array.isArray(value.messages)&&value.messages.length) summary.push(`${value.messages.length} current chat messages`);
-      contextStatus.textContent=summary.length?`FreeText account context: ${summary.join(" • ")} • local only`:`FreeText account context: connected • local only`;
-      contextStatus.className="context ready";
-      return value;
-    }catch{
-      contextStatus.textContent="FreeText account context: unavailable";
-      contextStatus.className="context empty";
-      return null;
-    }
-  }
-
-  function contextForPrompt(){
-    const value=loadAuthorizedContext();
-    if(!value)return "No authorized FreeText account context is currently available.";
-    const compact={
-      profile:value.profile||null,
-      posts:Array.isArray(value.posts)?value.posts.slice(0,12):[],
-      notifications:Array.isArray(value.notifications)?value.notifications.slice(0,12):[],
-      stories:Array.isArray(value.stories)?value.stories.slice(0,12):[],
-      messages:Array.isArray(value.messages)?value.messages.slice(-20):[]
-    };
-    return "AUTHORIZED CURRENT-USER FREETEXT CONTEXT (local browser data only):\n"+JSON.stringify(compact);
-  }
-
-  function add(text,who){
-    if(empty) empty.remove();
-    const d=document.createElement("div");
-    d.className="msg "+who;
-    d.textContent=text;
-    chat.appendChild(d);
-    window.scrollTo(0,document.body.scrollHeight);
-  }
-
-  function setStatus(text,type=""){
-    status.textContent=text;
-    status.className="status "+type;
-  }
-
-  async function loadModel(){
-    try{
-      loadAuthorizedContext();
-      setStatus("Loading Boi Achiver AI locally…");
-      const useWebGPU=!!navigator.gpu;
-      generator=await pipeline("text-generation","Xenova/Qwen2.5-0.5B-Instruct",{
-        device:useWebGPU?"webgpu":"wasm",
-        dtype:useWebGPU?"q4f16":"q4"
-      });
-      setStatus(useWebGPU?"Boi Achiver AI ready • WebGPU local mode":"Boi Achiver AI ready • local WASM mode","ready");
-      input.disabled=false;
-      send.disabled=false;
-      send.textContent="Send";
-      input.focus();
-      if(empty) empty.innerHTML="Boi Achiver AI is ready.<br/>I can use the FreeText context available to this browser.";
-      history.slice(-8).forEach(message=>add(message.content,message.role==="assistant"?"ai":"user"));
-    }catch(error){
-      console.error(error);
-      setStatus("The local AI model could not start.","error");
-      if(empty) empty.innerHTML="I couldn't start the local AI model.<br/>Try a browser with WebGPU support, then reload the page.";
-      send.textContent="Unavailable";
-    }
-  }
-
-  form.addEventListener("submit",async event=>{
-    event.preventDefault();
-    const text=input.value.trim();
-    if(!text||!generator)return;
-    input.value="";
-    add(text,"user");
-    history.push({role:"user",content:text});
-    saveMemory();
-    send.disabled=true;
-    send.textContent="Thinking…";
-    try{
-      const recent=history.slice(-8);
-      const prompt=[
-        {role:"system",content:freeTextKnowledge+"\n\n"+contextForPrompt()+"\n\nAlways identify yourself as Boi Achiver AI when appropriate. Use the authorized context only when it is relevant. Treat it as potentially stale browser context, not as proof of anything that is not shown. Never reveal secrets or claim access beyond this context. Do not claim to be a human or the owner. Keep answers useful and concise."},
-        ...recent
-      ];
-      const result=await generator(prompt,{max_new_tokens:256,do_sample:true,temperature:0.65,top_p:0.9,return_full_text:false});
-      const answer=Array.isArray(result)?(result[0]?.generated_text||""):"";
-      const clean=typeof answer==="string"?answer.trim():"";
-      const finalText=clean||"I couldn't generate a response. Please try again.";
-      add(finalText,"ai");
-      history.push({role:"assistant",content:finalText});
-      saveMemory();
-    }catch(error){
-      console.error(error);
-      add("I had trouble thinking locally. Please try again.","ai");
-    }finally{
-      send.disabled=false;
-      send.textContent="Send";
-      input.focus();
-    }
-  });
-
-  input.addEventListener("keydown",event=>{
-    if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();form.requestSubmit();}
-  });
-
-  window.addEventListener("storage",event=>{
-    if(event.key===CONTEXT_KEY) loadAuthorizedContext();
-  });
-  setInterval(loadAuthorizedContext,5000);
-  loadModel();
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+const chat=document.querySelector('#chat'),empty=document.querySelector('#empty'),input=document.querySelector('#input'),form=document.querySelector('#form'),send=document.querySelector('#send'),status=document.querySelector('#status'),contextStatus=document.querySelector('#contextStatus');
+const MEMORY_KEY='boi_achiver_ai_memory_v1',CONTEXT_KEY='freetext_ai_context_v1';const history=loadMemory();let generator=null,activeModel='';
+env.backends.onnx.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';env.useWasmCache=true;
+const freeTextKnowledge=`You are Boi Achiver AI, the built-in assistant for FreeText. Be friendly, practical, honest and beginner-friendly. Call the user Boi Achiver when useful.
+FreeText is a mobile-first social communication app built with React, TypeScript, Vite and Supabase and deployed through Vercel. It has accounts/authentication, profiles, search, follows, posts, stories, comments, notifications, private chat, uploads, reports, verification, admin/moderation controls, roles/audit logs, themes and realtime features where implemented.
+This AI runs locally in the browser through Transformers.js. It does not use an OpenAI API key and does not call /api/ai. It has local browser conversation memory. Runtime FreeText context is not permanent model training.
+Security: only use authorized context already supplied by the current FreeText browser session. Never expose passwords, authentication tokens, API keys, service-role keys or another user's private data. Never claim access to all database rows or all users. Never bypass Supabase Row Level Security. If information is not in the supplied context, say so.
+The user may be a beginner and may use an Android phone. Give simple numbered steps and copyable code. Do not claim an action was completed unless it actually was. The local AI has no automatic live Internet access, so do not pretend to browse.`;
+function loadMemory(){try{const s=JSON.parse(localStorage.getItem(MEMORY_KEY)||'[]');return Array.isArray(s)?s.filter(x=>x&&typeof x.content==='string'&&typeof x.role==='string').slice(-12):[]}catch{return []}}
+function saveMemory(){try{localStorage.setItem(MEMORY_KEY,JSON.stringify(history.slice(-12)))}catch{}}
+function setStatus(text,type=''){status.textContent=text;status.className='status '+type}
+function add(text,who){if(empty)empty.remove();const d=document.createElement('div');d.className='msg '+who;d.textContent=text;chat.appendChild(d);window.scrollTo(0,document.body.scrollHeight)}
+function loadAuthorizedContext(){try{const v=JSON.parse(localStorage.getItem(CONTEXT_KEY)||'null');if(!v||typeof v!=='object'){contextStatus.textContent='FreeText account context: not available yet';contextStatus.className='context empty';return null}const s=[];if(v.profile)s.push('profile');if(Array.isArray(v.posts)&&v.posts.length)s.push(v.posts.length+' posts');if(Array.isArray(v.notifications)&&v.notifications.length)s.push(v.notifications.length+' notifications');if(Array.isArray(v.stories)&&v.stories.length)s.push(v.stories.length+' stories');if(Array.isArray(v.messages)&&v.messages.length)s.push(v.messages.length+' current chat messages');contextStatus.textContent=s.length?'FreeText account context: '+s.join(' • ')+' • local only':'FreeText account context: connected • local only';contextStatus.className='context ready';return v}catch{contextStatus.textContent='FreeText account context: unavailable';contextStatus.className='context empty';return null}}
+function contextForPrompt(){const v=loadAuthorizedContext();if(!v)return 'No authorized FreeText account context is currently available.';const c={profile:v.profile||null,posts:Array.isArray(v.posts)?v.posts.slice(0,10):[],notifications:Array.isArray(v.notifications)?v.notifications.slice(0,10):[],stories:Array.isArray(v.stories)?v.stories.slice(0,10):[],messages:Array.isArray(v.messages)?v.messages.slice(-16):[]};return 'AUTHORIZED CURRENT-USER FREETEXT CONTEXT (local browser data only):\n'+JSON.stringify(c)}
+function shortError(e){const m=String(e?.message||e||'Unknown error').replace(/\s+/g,' ').trim();return m.slice(0,180)}
+async function tryPipeline(model,options){setStatus(options.device==='webgpu'?'Trying WebGPU…':'Trying mobile WASM…');return await pipeline('text-generation',model,options)}
+async function loadModel(){loadAuthorizedContext();const attempts=[];
+if(navigator.gpu){try{generator=await tryPipeline('onnx-community/Qwen2.5-0.5B-Instruct',{device:'webgpu',dtype:'q4'});activeModel='Qwen2.5-0.5B-Instruct • WebGPU'}catch(e){console.warn('WebGPU model load failed:',e);attempts.push('WebGPU: '+shortError(e));generator=null}}
+if(!generator){try{generator=await tryPipeline('onnx-community/Qwen2.5-0.5B-Instruct',{device:'wasm',dtype:'q4'});activeModel='Qwen2.5-0.5B-Instruct • WASM'}catch(e){console.warn('Qwen WASM load failed:',e);attempts.push('WASM: '+shortError(e));generator=null}}
+if(!generator){try{generator=await tryPipeline('onnx-community/SmolLM2-135M-Instruct-ONNX-MHA',{device:'wasm',dtype:'q4'});activeModel='SmolLM2-135M • WASM fallback'}catch(e){console.warn('Small fallback load failed:',e);attempts.push('Small model: '+shortError(e));generator=null}}
+if(!generator){setStatus('Local AI could not start','error');if(empty)empty.innerHTML='I could not start the local AI on this device.<br/><small>Model startup failed. Open browser console for technical details.</small>';contextStatus.textContent='FreeText account context: available independently of AI startup';send.textContent='Unavailable';console.error('Boi Achiver AI startup diagnostics',attempts);return}
+setStatus('Boi Achiver AI ready • '+activeModel,'ready');input.disabled=false;send.disabled=false;send.textContent='Send';if(empty)empty.innerHTML='Boi Achiver AI is ready.<br/>I can use the FreeText context available to this browser.';history.slice(-8).forEach(m=>add(m.content,m.role==='assistant'?'ai':'user'));input.focus()}
+form.addEventListener('submit',async e=>{e.preventDefault();const text=input.value.trim();if(!text||!generator)return;input.value='';add(text,'user');history.push({role:'user',content:text});saveMemory();send.disabled=true;send.textContent='Thinking…';try{const prompt=[{role:'system',content:freeTextKnowledge+'\n\n'+contextForPrompt()+'\n\nUse authorized context only when relevant. Treat it as potentially stale browser data. Keep answers useful and concise.'},...history.slice(-8)];const r=await generator(prompt,{max_new_tokens:160,do_sample:true,temperature:.65,top_p:.9,return_full_text:false});const out=Array.isArray(r)?(r[0]?.generated_text||''):'';const answer=typeof out==='string'&&out.trim()?out.trim():'I could not generate a response. Please try again.';add(answer,'ai');history.push({role:'assistant',content:answer});saveMemory()}catch(e){console.error(e);add('I had trouble thinking locally. Please try again.','ai')}finally{send.disabled=false;send.textContent='Send';input.focus()}});
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});window.addEventListener('storage',e=>{if(e.key===CONTEXT_KEY)loadAuthorizedContext()});setInterval(loadAuthorizedContext,5000);loadModel();
 </script>
 </body>
 </html>
