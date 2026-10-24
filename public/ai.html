@@ -18,13 +18,13 @@
 <main>
   <header class="top">
     <div class="brand">🤖 Boi Achiver AI</div>
-    <div class="sub">Private local AI • No OpenAI API key • Runs on your device</div>
+    <div class="sub">Private local AI • FreeText knowledge • No OpenAI API key</div>
     <div id="status" class="status">Loading the local AI model…</div>
   </header>
-  <section id="chat" class="chat"><div class="empty" id="empty">Boi Achiver AI is starting…<br/>The first model download can take a while.</div></section>
+  <section id="chat" class="chat"><div class="empty" id="empty">Boi Achiver AI is starting…<br/>Your local FreeText assistant is loading.</div></section>
   <form class="composer" id="form">
     <div class="box"><textarea id="input" placeholder="Message Boi Achiver AI…" rows="1" disabled></textarea><button id="send" disabled>Loading…</button></div>
-    <div class="tools"><span>🔒 Your conversation is processed locally after the model loads.</span><div class="privacy">No OpenAI key is used. No request is sent to /api/ai.</div></div>
+    <div class="tools"><span>🔒 Local AI • FreeText knowledge • local conversation memory</span><div class="privacy">No OpenAI key is used. No request is sent to /api/ai.</div></div>
   </form>
 </main>
 <script type="module">
@@ -36,8 +36,31 @@
   const form=document.querySelector("#form");
   const send=document.querySelector("#send");
   const status=document.querySelector("#status");
-  const history=[];
+  const MEMORY_KEY="boi_achiver_ai_memory_v1";
+  const history=loadMemory();
   let generator=null;
+
+  const freeTextKnowledge=`
+You are Boi Achiver AI, the built-in assistant for FreeText.
+FreeText is a social communication platform built with React, TypeScript, Vite and Supabase.
+FreeText includes accounts, profiles, search, follows, posts, stories, comments, notifications, chat, uploads, reports, verification, admin controls, audit logs, themes and realtime features.
+The FreeText AI interface is mobile-first and is designed to work well on phones.
+Boi Achiver AI currently runs locally in the browser with an open-source Qwen2.5 0.5B Instruct model through Transformers.js. It does not require an OpenAI API key.
+The local model does not automatically have live Internet access. Never pretend that it does.
+Boi Achiver AI should be friendly, clear, practical and honest. For coding questions, give simple steps suitable for a beginner and prefer FreeText examples when relevant.
+If asked about FreeText features that are not listed here, say that you do not have enough information instead of inventing details.
+`;
+
+  function loadMemory(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(MEMORY_KEY)||"[]");
+      return Array.isArray(saved)?saved.filter(x=>x&&typeof x.content==="string"&&typeof x.role==="string").slice(-12):[];
+    }catch{return []}
+  }
+
+  function saveMemory(){
+    try{localStorage.setItem(MEMORY_KEY,JSON.stringify(history.slice(-12)));}catch{}
+  }
 
   function add(text,who){
     if(empty) empty.remove();
@@ -55,18 +78,19 @@
 
   async function loadModel(){
     try{
-      setStatus("Downloading the local AI model… This happens only when the browser needs the model.");
+      setStatus("Loading Boi Achiver AI locally…");
       const useWebGPU=!!navigator.gpu;
       generator=await pipeline("text-generation","Xenova/Qwen2.5-0.5B-Instruct",{
         device:useWebGPU?"webgpu":"wasm",
         dtype:useWebGPU?"q4f16":"q4"
       });
-      setStatus(useWebGPU?"Boi Achiver AI is ready • WebGPU local mode":"Boi Achiver AI is ready • local WASM mode","ready");
+      setStatus(useWebGPU?"Boi Achiver AI ready • WebGPU local mode":"Boi Achiver AI ready • local WASM mode","ready");
       input.disabled=false;
       send.disabled=false;
       send.textContent="Send";
       input.focus();
-      if(empty) empty.innerHTML="Boi Achiver AI is ready.<br/>Ask me anything — no API key required.";
+      if(empty) empty.innerHTML="Boi Achiver AI is ready.<br/>I know the FreeText project and can remember this local chat.";
+      history.slice(-8).forEach(message=>add(message.content,message.role==="assistant"?"ai":"user"));
     }catch(error){
       console.error(error);
       setStatus("The local AI model could not start.","error");
@@ -82,20 +106,22 @@
     input.value="";
     add(text,"user");
     history.push({role:"user",content:text});
+    saveMemory();
     send.disabled=true;
     send.textContent="Thinking…";
     try{
       const recent=history.slice(-8);
       const prompt=[
-        {role:"system",content:"You are Boi Achiver AI inside FreeText. Be helpful, friendly, honest and concise. Do not claim to have internet access or live information. If you do not know something, say so."},
+        {role:"system",content:freeTextKnowledge+"\nAlways identify yourself as Boi Achiver AI when appropriate. Do not claim to be a human or the owner. Keep answers useful and concise."},
         ...recent
       ];
-      const result=await generator(prompt,{max_new_tokens:256,do_sample:true,temperature:0.7,top_p:0.9,return_full_text:false});
+      const result=await generator(prompt,{max_new_tokens:256,do_sample:true,temperature:0.65,top_p:0.9,return_full_text:false});
       const answer=Array.isArray(result)?(result[0]?.generated_text||""):"";
       const clean=typeof answer==="string"?answer.trim():"";
       const finalText=clean||"I couldn't generate a response. Please try again.";
       add(finalText,"ai");
       history.push({role:"assistant",content:finalText});
+      saveMemory();
     }catch(error){
       console.error(error);
       add("I had trouble thinking locally. Please try again.","ai");
