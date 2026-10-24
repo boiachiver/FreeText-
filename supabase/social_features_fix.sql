@@ -1,6 +1,6 @@
 -- FreeText social features compatibility and direct-message RLS fixes
 -- Safe to run in the Supabase SQL Editor more than once.
--- Create messaging tables first in case schema.sql has not been applied yet.
+-- Create messaging and story tables first in case schema.sql has not been applied yet.
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   is_group boolean not null default false,
@@ -26,10 +26,20 @@ create table if not exists public.messages (
   read_at timestamptz
 );
 
+create table if not exists public.stories (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  media_url text not null,
+  media_type text not null default 'image' check (media_type in ('image','video')),
+  expires_at timestamptz not null default (now() + interval '24 hours'),
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles add column if not exists cover_url text;
 alter table public.conversations enable row level security;
 alter table public.conversation_members enable row level security;
 alter table public.messages enable row level security;
+alter table public.stories enable row level security;
 
 -- SECURITY DEFINER avoids recursive RLS while checking membership.
 create or replace function public.is_conversation_member(target_conversation uuid, target_user uuid default auth.uid())
@@ -104,4 +114,10 @@ drop policy if exists stories_read on public.stories;
 create policy stories_read on public.stories for select
 using (expires_at > now() or author_id = auth.uid() or public.is_admin());
 
+drop policy if exists stories_write on public.stories;
+create policy stories_write on public.stories for all
+using (author_id = auth.uid() or public.is_admin())
+with check (author_id = auth.uid() or public.is_admin());
+
 create index if not exists messages_conversation_idx on public.messages(conversation_id, created_at);
+create index if not exists stories_expires_idx on public.stories(expires_at);
