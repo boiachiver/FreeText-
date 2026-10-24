@@ -45,48 +45,42 @@ function buildPrompt(messages: ChatMessage[], context: any) {
 }
 
 async function runOpenModel(messages: ChatMessage[], context: any): Promise<AIResult> {
-  const prompt = buildPrompt(messages, context);
-  const hfToken = process.env.HF_TOKEN;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (hfToken) headers.Authorization = `Bearer ${hfToken}`;
+  const hfToken = (globalThis as any).process?.env?.HF_TOKEN as string | undefined;
+  if (!hfToken) {
+    throw new Error("Online AI needs an HF_TOKEN with Inference Providers permission. Add it to Vercel Environment Variables and redeploy.");
+  }
 
-  // Hugging Face retired the legacy api-inference.huggingface.co hostname.
-  // Use the current router endpoint. HF_TOKEN is optional in code, but
-  // Hugging Face may require it for hosted inference depending on access/quota.
-  const response = await fetch(
-    "https://router.huggingface.co/hf-inference/models/HuggingFaceTB/SmolLM2-1.7B-Instruct",
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 450,
-          temperature: 0.65,
-          return_full_text: false,
-        },
-        options: { wait_for_model: true },
-      }),
-    }
-  );
+  const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${hfToken}`,
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-120b:cheapest",
+      messages: [
+        { role: "system", content: buildSystem(context) },
+        ...messages.map((message) => ({ role: message.role, content: message.content })),
+      ],
+      max_tokens: 450,
+      temperature: 0.65,
+      stream: false,
+    }),
+  });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const detail = String(data?.error || data?.message || `HTTP ${response.status}`);
+    const detail = String(data?.error?.message || data?.error || data?.message || `HTTP ${response.status}`);
     if (response.status === 401 || response.status === 403) {
-      throw new Error("Hugging Face requires inference access for this model. Configure HF_TOKEN in Vercel Environment Variables, then redeploy.");
+      throw new Error("Hugging Face rejected the token or inference access. Check HF_TOKEN permissions in Vercel.");
     }
     if (response.status === 429) {
-      throw new Error("The free inference service is busy or rate-limited. Please try again shortly.");
+      throw new Error("The online AI provider is busy or rate-limited. Please try again shortly.");
     }
-    throw new Error(`Hugging Face inference failed: ${detail.slice(0, 240)}`);
+    throw new Error(`Online AI request failed: ${detail.slice(0, 240)}`);
   }
 
-  const generated = Array.isArray(data)
-    ? data[0]?.generated_text
-    : data?.generated_text;
-  const text = String(generated || "").trim();
-
+  const text = String(data?.choices?.[0]?.message?.content || "").trim();
   if (!text) throw new Error("The online AI returned an empty response.");
 
   return {
@@ -95,7 +89,7 @@ async function runOpenModel(messages: ChatMessage[], context: any): Promise<AIRe
     online: true,
     liveSearch: false,
     provider: "Hugging Face",
-    model: "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    model: "openai/gpt-oss-120b:cheapest",
   };
 }
 
