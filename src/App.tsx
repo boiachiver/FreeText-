@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { FormEvent } from "react";
 import { Bell, Lock, Moon, Shield, Sun, User, UserPlus, X } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { syncAiContext, clearAiContext } from "./lib/aiContext";
 import Navbar from "./components/Navbar";
 import Profile from "./components/Profile";
 import EditProfile from "./components/EditProfile";
@@ -116,11 +117,20 @@ function App() {
 
   const loadNotifications = async () => { if (!session?.user?.id) return; const { data } = await supabase.from("notifications").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(50); setNotifications(data || []); };
   const loadStories = async () => { if (!session?.user?.id) return; const { data, error: e } = await supabase.from("stories").select("id,author_id,media_url,media_type,expires_at,created_at,profiles(full_name,username,avatar_url)").gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(50); if (e) { console.error(e); return; } setStories((data || []).map((s: any) => ({ id: s.id, name: s.profiles?.full_name || s.profiles?.username || "FreeText user", username: s.profiles?.username || "user", avatar: s.profiles?.avatar_url || "https://i.pravatar.cc/150?u=" + s.author_id, mediaUrl: s.media_url, mediaType: s.media_type, createdAt: s.created_at, expiresAt: s.expires_at }))); };
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      clearAiContext();
+      return;
+    }
+    syncAiContext({ profile, posts, notifications, stories, messages: chatMessages });
+  }, [session?.user?.id, profile, posts, notifications, stories, chatMessages]);
+
   const chooseStoryImage = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) { setError("Choose a story image smaller than 8MB."); return; } setStoryFile(file); setStoryImage(URL.createObjectURL(file)); };
   const publishStory = async () => { if (!session?.user?.id || !storyFile) { setError("Choose an image for your story first."); return; } setError(""); const ext = storyFile.name.split(".").pop()?.toLowerCase() || "jpg"; const path = `${session.user.id}/story-${crypto.randomUUID()}.${ext}`; const upload = await supabase.storage.from("media").upload(path, storyFile, { contentType: storyFile.type, upsert: false }); if (upload.error) { setError(upload.error.message); return; } const mediaUrl = supabase.storage.from("media").getPublicUrl(path).data.publicUrl; const { error: e } = await supabase.from("stories").insert({ author_id: session.user.id, media_url: mediaUrl, media_type: storyFile.type.startsWith("video/") ? "video" : "image", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }); if (e) { setError(e.message); return; } setStoryImage(""); setStoryFile(null); setShowStoryCreate(false); await loadStories(); };
   useEffect(() => { if (!session?.user?.id) return; loadPeople(); loadPosts(); loadNotifications(); loadStories(); const storyChannel = supabase.channel("freetext-stories").on("postgres_changes", { event: "*", schema: "public", table: "stories" }, loadStories).subscribe(); const postChannel = supabase.channel("freetext-posts").on("postgres_changes", { event: "*", schema: "public", table: "posts" }, loadPosts).subscribe(); const notificationChannel = supabase.channel("freetext-notifications").on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${session.user.id}` }, loadNotifications).subscribe(); return () => { supabase.removeChannel(storyChannel); supabase.removeChannel(postChannel); supabase.removeChannel(notificationChannel); }; }, [session?.user?.id]);
 
-  const logout = async () => { const { error: e } = await supabase.auth.signOut(); if (e) setError(e.message); else { setProfile(null); setPage("home"); } };
+  const logout = async () => { const { error: e } = await supabase.auth.signOut(); if (e) setError(e.message); else { clearAiContext(); setProfile(null); setPage("home"); } };
   const openProfile = () => { setPage("profile"); setShowNotifications(false); };
   const toggleFollow = async (personId: string) => { if (!session?.user?.id) return; const alreadyFollowing = followingIds.includes(personId); const result = alreadyFollowing ? await supabase.from("follows").delete().eq("follower_id", session.user.id).eq("following_id", personId) : await supabase.from("follows").insert({ follower_id: session.user.id, following_id: personId }); if (result.error) { setError(result.error.message); return; } setFollowingIds(current => alreadyFollowing ? current.filter(id => id !== personId) : [...current, personId]); if (!alreadyFollowing) { const { error: notificationError } = await supabase.from("notifications").insert({ user_id: personId, actor_id: session.user.id, type: "follow", entity_id: session.user.id, message: `${profile?.full_name || profile?.username || "Someone"} started following you` }); if (notificationError) console.error(notificationError); } };
   const profileAvatar = profile?.avatar_url || "https://i.pravatar.cc/150?u=" + (session?.user?.id || "freetext");
