@@ -11,6 +11,8 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Pencil,
+  Inbox,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -33,6 +35,8 @@ export default function Auth() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [resendSeconds, setResendSeconds] = useState(0);
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
 
   const clearMessages = () => {
     setError("");
@@ -90,9 +94,11 @@ export default function Auth() {
       setError("Please enter your email and password.");
       return;
     }
+
     setLoading(true);
     const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim(), password,
+      email: email.trim(),
+      password,
     });
     setLoading(false);
 
@@ -186,6 +192,46 @@ export default function Auth() {
     setResendSeconds(RESEND_COOLDOWN);
   };
 
+  const changeEmailAndResend = async () => {
+    clearMessages();
+    const targetEmail = newEmail.trim().toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    if (targetEmail === email.trim().toLowerCase()) {
+      setError("That's already the email on this screen.");
+      return;
+    }
+
+    if (!password) {
+      setError("For security, go back and enter your password before changing the email.");
+      return;
+    }
+
+    setLoading(true);
+    const { data, error: signupError } = await supabase.auth.signUp({
+      email: targetEmail,
+      password,
+      options: { emailRedirectTo: VERIFICATION_REDIRECT },
+    });
+    setLoading(false);
+
+    if (signupError) {
+      setError(signupError.message);
+      return;
+    }
+
+    setEmail(targetEmail);
+    localStorage.setItem(PENDING_VERIFICATION_KEY, targetEmail);
+    setNewEmail("");
+    setChangingEmail(false);
+    setMessage(data.session ? "Email updated successfully." : "We've sent a new verification email to your new address.");
+    setResendSeconds(RESEND_COOLDOWN);
+  };
+
   const checkVerification = async () => {
     clearMessages();
     setLoading(true);
@@ -263,17 +309,70 @@ export default function Auth() {
   if (step === 2) {
     return (
       <main className="auth-page">
+        <style>{`
+          .verification-card{position:relative;overflow:hidden;max-width:520px!important;background:rgba(255,255,255,.96)!important;border:1px solid rgba(255,255,255,.8)!important;box-shadow:0 30px 90px rgba(31,41,55,.18),0 8px 28px rgba(37,99,235,.08)!important}
+          html.dark .verification-card{background:rgba(18,24,33,.97)!important;border-color:#263242!important}
+          .verification-visual{height:150px;margin:-4px -4px 22px;border-radius:22px;background:linear-gradient(135deg,#eef5ff,#f7f9ff);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+          html.dark .verification-visual{background:linear-gradient(135deg,#13233d,#17202d)}
+          .verification-visual::before,.verification-visual::after{content:"";position:absolute;border-radius:999px;background:rgba(37,99,235,.08);animation:verifyPulse 3s ease-in-out infinite}
+          .verification-visual::before{width:180px;height:180px}.verification-visual::after{width:250px;height:250px;animation-delay:1s}
+          .verify-scene{position:relative;z-index:2;width:220px;height:110px}
+          .verify-mail{position:absolute;left:35px;top:28px;width:82px;height:60px;border-radius:14px;background:white;border:1px solid #dce7f8;box-shadow:0 14px 28px rgba(37,99,235,.16);display:grid;place-items:center;color:#2563eb;animation:mailFloat 2.8s ease-in-out infinite}
+          html.dark .verify-mail{background:#202b3a;border-color:#34445a}
+          .verify-mail::after{content:"";position:absolute;inset:12px;border:2px solid #dbe7fb;border-top:0;border-radius:5px;transform:skewY(-24deg)}
+          .verify-arrow{position:absolute;left:115px;top:50px;width:55px;height:2px;background:#8db0f5;animation:arrowGlow 1.8s ease-in-out infinite}
+          .verify-arrow::after{content:"";position:absolute;right:0;top:-4px;width:9px;height:9px;border-top:2px solid #2563eb;border-right:2px solid #2563eb;transform:rotate(45deg)}
+          .verify-inbox{position:absolute;right:12px;top:23px;width:72px;height:70px;border-radius:16px;background:#eaf1ff;border:1px solid #cfe0ff;display:grid;place-items:center;color:#2563eb;animation:inboxGlow 2.8s ease-in-out infinite}
+          html.dark .verify-inbox{background:#203250;border-color:#31517e}
+          .verify-check{position:absolute;right:0;bottom:8px;width:30px;height:30px;border-radius:50%;background:#22c55e;color:white;display:grid;place-items:center;border:3px solid white;box-shadow:0 6px 15px rgba(34,197,94,.28);animation:checkPop 2.8s ease-in-out infinite}
+          html.dark .verify-check{border-color:#17202d}
+          @keyframes mailFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(2deg)}}
+          @keyframes inboxGlow{0%,100%{transform:scale(1);box-shadow:0 0 0 rgba(37,99,235,0)}50%{transform:scale(1.05);box-shadow:0 0 28px rgba(37,99,235,.18)}}
+          @keyframes arrowGlow{0%,100%{opacity:.45;width:45px}50%{opacity:1;width:58px}}
+          @keyframes checkPop{0%,65%,100%{transform:scale(1)}72%{transform:scale(1.16)}
+          }
+          @keyframes verifyPulse{0%,100%{transform:scale(.85);opacity:.45}50%{transform:scale(1.08);opacity:.9}}
+          .verification-badge{width:max-content;max-width:100%;margin:0 auto 12px;padding:7px 11px;border-radius:999px;background:#edf7ef;color:#16803b;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}
+          html.dark .verification-badge{background:#10281a;color:#6ee7a0}
+          .verification-lead{max-width:400px;margin-left:auto;margin-right:auto}
+          .verification-email-box{margin:18px 0;padding:15px 16px;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:15px;background:#f5f8ff;border:1px solid #dce7fb;color:#25324a;word-break:break-word}
+          html.dark .verification-email-box{background:#172231;border-color:#2a3b50;color:#e7edf7}
+          .verification-email-box strong{font-size:14px}
+          .verification-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 20px}
+          .verification-step{padding:12px 8px;border:1px solid #e7ebf2;border-radius:14px;background:#fafbfd;text-align:center}
+          html.dark .verification-step{background:#141c27;border-color:#273342}
+          .verification-step span{width:26px;height:26px;margin:0 auto 7px;display:grid;place-items:center;border-radius:50%;background:#e8f0ff;color:#2563eb;font-size:12px;font-weight:900}
+          .verification-step p{font-size:11px;line-height:1.35;color:#667085}
+          html.dark .verification-step p{color:#aab5c5}
+          .verification-resend-box{margin-top:15px;padding:15px;border-radius:16px;background:linear-gradient(135deg,#f8faff,#f3f7ff);border:1px solid #e0e8f8;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left}
+          html.dark .verification-resend-box{background:#151f2d;border-color:#2a3a4d}
+          .verification-resend-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+          .verification-resend-copy strong{font-size:13px}.verification-resend-copy span{font-size:11px;color:#7b8798;line-height:1.4}
+          .verification-resend-button{flex:0 0 auto;min-height:40px;padding:0 13px;border-radius:11px;background:#2563eb;color:white;font-size:12px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap;transition:.2s}
+          .verification-resend-button:hover:not(:disabled){transform:translateY(-1px);background:#1d4ed8}.verification-resend-button:disabled{opacity:.55;cursor:not-allowed}
+          .change-email-link{margin:16px auto 4px;background:transparent;color:#2563eb;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px}.change-email-link:hover{text-decoration:underline}
+          .change-email-panel{margin:12px 0 4px;padding:14px;border-radius:15px;background:#f8fafc;border:1px solid #e2e8f0;text-align:left}.change-email-panel label{display:block;margin-bottom:7px;font-size:12px;font-weight:800;color:#475569}.change-email-row{display:flex;gap:8px}.change-email-row input{flex:1;min-width:0;border:1px solid #d6deea;border-radius:10px;padding:10px 12px;background:white;color:#172033}.change-email-row button{padding:0 13px;border-radius:10px;background:#172033;color:white;font-weight:800;font-size:12px}.change-email-cancel{margin-top:8px;background:transparent;color:#64748b;font-size:11px}
+          html.dark .change-email-panel{background:#141c27;border-color:#2a3747}html.dark .change-email-row input{background:#0f151d;border-color:#334155;color:white}html.dark .change-email-row button{background:#2563eb}
+          .verification-tip{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;font-size:11px;color:#8490a2;line-height:1.45}
+          @media(max-width:520px){.verification-card{padding:18px!important;border-radius:22px!important}.verification-visual{height:132px}.verification-steps{gap:6px}.verification-step{padding:10px 5px}.verification-resend-box{flex-direction:column;align-items:stretch}.verification-resend-button{justify-content:center}.change-email-row{flex-direction:column}.change-email-row button{height:42px}}
+        `}</style>
+
         <div className="auth-glow auth-glow-one" />
         <div className="auth-glow auth-glow-two" />
+
         <section className="auth-card verification-card">
           <div className="auth-brand">
             <div className="auth-logo">F</div>
             <span>FreeText</span>
           </div>
 
-          <div className="verification-hero-icon">
-            <Mail size={30} />
-            <span><Sparkles size={14} /></span>
+          <div className="verification-visual" aria-hidden="true">
+            <div className="verify-scene">
+              <div className="verify-mail"><Mail size={28} /></div>
+              <div className="verify-arrow" />
+              <div className="verify-inbox"><Inbox size={30} /></div>
+              <div className="verify-check"><CheckCircle2 size={15} /></div>
+            </div>
           </div>
 
           <div className="verification-badge">
@@ -282,7 +381,7 @@ export default function Auth() {
 
           <h1 className="auth-heading">Check your email</h1>
           <p className="auth-helper verification-lead">
-            We sent a verification link to the email address below.
+            Your FreeText account is almost ready. We sent a secure verification link to:
           </p>
 
           <div className="verification-email-box">
@@ -291,9 +390,9 @@ export default function Auth() {
           </div>
 
           <div className="verification-steps">
-            <div><span>1</span><p>Open the email from FreeText.</p></div>
-            <div><span>2</span><p>Tap the verification link.</p></div>
-            <div><span>3</span><p>Come back here and confirm.</p></div>
+            <div className="verification-step"><span>1</span><p>Open the FreeText email.</p></div>
+            <div className="verification-step"><span>2</span><p>Tap the verify link.</p></div>
+            <div className="verification-step"><span>3</span><p>Come back and continue.</p></div>
           </div>
 
           {error && <div className="auth-error">{error}</div>}
@@ -309,9 +408,9 @@ export default function Auth() {
           </button>
 
           <div className="verification-resend-box">
-            <div>
+            <div className="verification-resend-copy">
               <strong>Didn't receive the email?</strong>
-              <span>Check spam or request a new verification link.</span>
+              <span>Check spam or junk, then request another link.</span>
             </div>
             <button className="verification-resend-button" type="button" onClick={resendVerification} disabled={loading || resendSeconds > 0}>
               <RefreshCw size={17} />
@@ -319,11 +418,30 @@ export default function Auth() {
             </button>
           </div>
 
-          <button className="auth-phone-button" type="button" onClick={() => { clearMessages(); setStep(1); }}>
+          {!changingEmail ? (
+            <button className="change-email-link" type="button" onClick={() => { clearMessages(); setNewEmail(email); setChangingEmail(true); }}>
+              <Pencil size={14} /> Change email address
+            </button>
+          ) : (
+            <div className="change-email-panel">
+              <label htmlFor="change-email">Use a different email</label>
+              <div className="change-email-row">
+                <input id="change-email" type="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="new@email.com" autoComplete="email" />
+                <button type="button" onClick={changeEmailAndResend} disabled={loading}>
+                  {loading ? "Sending..." : "Send there"}
+                </button>
+              </div>
+              <button className="change-email-cancel" type="button" onClick={() => setChangingEmail(false)}>Cancel</button>
+            </div>
+          )}
+
+          <button className="auth-phone-button" type="button" onClick={() => { clearMessages(); setChangingEmail(false); setStep(1); }}>
             <ArrowLeft size={17} /> Back to sign in
           </button>
 
-          <p className="auth-terms">Tip: Search your inbox for “FreeText” if you don't see the message right away.</p>
+          <p className="verification-tip">
+            <Sparkles size={13} /> Tip: search your inbox for “FreeText” if the email isn't visible yet.
+          </p>
         </section>
       </main>
     );
@@ -385,7 +503,11 @@ export default function Auth() {
         <button className="auth-phone-button" type="button" onClick={() => setMessage("Phone sign-in will be available soon.")}>Continue with phone</button>
         <p className="auth-terms">By continuing, you agree to the FreeText Terms of Service and Privacy Policy.</p>
         <div className="auth-footer">
-          {mode === "login" ? <>Don't have an account? <button type="button" onClick={() => { clearMessages(); setMode("signup"); }}>Sign up</button></> : <>Already have an account? <button type="button" onClick={() => { clearMessages(); setMode("login"); }}>Log in</button></>}
+          {mode === "login" ? <>
+            Don't have an account? <button type="button" onClick={() => { clearMessages(); setMode("signup"); }}>Sign up</button>
+          </> : <>
+            Already have an account? <button type="button" onClick={() => { clearMessages(); setMode("login"); }}>Log in</button>
+          </>}
         </div>
       </section>
     </main>
