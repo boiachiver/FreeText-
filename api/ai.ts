@@ -1,3 +1,5 @@
+declare const process: { env: Record<string, string | undefined> };
+
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type AIResult = {
@@ -11,11 +13,11 @@ type AIResult = {
 function buildInput(messages: any[]): ChatMessage[] {
   return messages
     .slice(-20)
-    .map((message: any) => ({
+    .map((message: any): ChatMessage => ({
       role: message?.role === "assistant" ? "assistant" : "user",
       content: String(message?.content || "").trim(),
     }))
-    .filter((message: ChatMessage) => message.content.length > 0);
+    .filter((message) => message.content.length > 0);
 }
 
 function buildSystem(context: any) {
@@ -137,7 +139,7 @@ function extractGenerateContent(data: any) {
 }
 
 async function callGeminiGenerateContent(messages: ChatMessage[], webSearch: boolean, context: any, apiKey: string): Promise<AIResult> {
-  const contents = messages.map((message) => ({
+  const contents = messages.map((message): { role: "user" | "model"; parts: { text: string }[] } => ({
     role: message.role === "assistant" ? "model" : "user",
     parts: [{ text: message.content }],
   }));
