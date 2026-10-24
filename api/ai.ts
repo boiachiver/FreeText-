@@ -36,60 +36,55 @@ function buildSystem(context: any) {
   ].join("\n\n");
 }
 
-function buildPrompt(messages: ChatMessage[], context: any) {
-  const transcript = messages
-    .map((message) => `${message.role === "assistant" ? "Boi Achiver AI" : "User"}: ${message.content}`)
-    .join("\n\n");
+async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResult> {
+  const apiKey = (globalThis as any).process?.env?.OPENAI_API_KEY as string | undefined;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured in Vercel Production.");
 
-  return `${buildSystem(context)}\n\nCONVERSATION:\n${transcript}\n\nBoi Achiver AI:`;
-}
-
-async function runOpenModel(messages: ChatMessage[], context: any): Promise<AIResult> {
-  const hfToken = (globalThis as any).process?.env?.HF_TOKEN as string | undefined;
-  if (!hfToken) {
-    throw new Error("Online AI needs an HF_TOKEN with Inference Providers permission. Add it to Vercel Environment Variables and redeploy.");
-  }
-
-  const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${hfToken}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "openai/gpt-oss-120b:cheapest",
-      messages: [
-        { role: "system", content: buildSystem(context) },
-        ...messages.map((message) => ({ role: message.role, content: message.content })),
-      ],
-      max_tokens: 450,
-      temperature: 0.65,
-      stream: false,
+      model: "gpt-6-luna",
+      instructions: buildSystem(context),
+      input: messages.map((message) => ({
+        role: message.role,
+        content: [{ type: "input_text", text: message.content }],
+      })),
+      max_output_tokens: 450,
     }),
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const detail = String(data?.error?.message || data?.error || data?.message || `HTTP ${response.status}`);
+    const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
     if (response.status === 401 || response.status === 403) {
-      throw new Error("Hugging Face rejected the token or inference access. Check HF_TOKEN permissions in Vercel.");
+      throw new Error("OpenAI rejected OPENAI_API_KEY. Check that the key is valid and has API billing/access enabled.");
     }
     if (response.status === 429) {
-      throw new Error("The online AI provider is busy or rate-limited. Please try again shortly.");
+      throw new Error("OpenAI is rate-limited or the API account has no available usage. Please check API billing/limits.");
     }
-    throw new Error(`Online AI request failed: ${detail.slice(0, 240)}`);
+    throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
   }
 
-  const text = String(data?.choices?.[0]?.message?.content || "").trim();
-  if (!text) throw new Error("The online AI returned an empty response.");
+  const text = String(
+    data?.output_text ||
+      data?.output?.flatMap((item: any) => item?.content || [])
+        ?.map((item: any) => item?.text || "")
+        ?.join(" ") || "",
+  ).trim();
+
+  if (!text) throw new Error("OpenAI returned an empty response.");
 
   return {
     text,
     sources: [],
     online: true,
     liveSearch: false,
-    provider: "Hugging Face",
-    model: "openai/gpt-oss-120b:cheapest",
+    provider: "OpenAI",
+    model: "gpt-6-luna",
   };
 }
 
@@ -106,13 +101,12 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "Please send a message." });
     }
 
-    const result = await runOpenModel(input, context);
+    const result = await runOpenAI(input, context);
     return res.status(200).json(result);
   } catch (error: any) {
-    console.error("Boi Achiver AI online model error:", error);
+    console.error("Boi Achiver AI OpenAI error:", error);
     const message = String(error?.message || "");
-    const status = /requires inference access/i.test(message) ? 503 : 502;
-    return res.status(status).json({
+    return res.status(502).json({
       online: false,
       error: message || "Boi Achiver AI is temporarily unavailable. Please try again.",
     });
