@@ -2,28 +2,48 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07111f" />
 
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-
+    <title>FreeText — Connect, Share & Chat</title>
     <meta
       name="description"
-      content="FreeText — Connect, share, and express yourself freely."
+      content="FreeText is a modern social platform for connecting with friends, sharing posts and stories, messaging, and using Boi Achiver AI."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://freetext-app.vercel.app/" />
 
-    <meta
-      name="theme-color"
-      content="#ffffff"
-    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FreeText" />
+    <meta property="og:title" content="FreeText — Connect, Share & Chat" />
+    <meta property="og:description" content="Connect with friends, share your world, message privately, and use Boi Achiver AI." />
+    <meta property="og:url" content="https://freetext-app.vercel.app/" />
+    <meta property="og:image" content="https://freetext-app.vercel.app/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FreeText — Connect, Share & Chat" />
+    <meta name="twitter:description" content="A modern social experience with private messaging and Boi Achiver AI." />
+    <meta name="twitter:image" content="https://freetext-app.vercel.app/icons/icon-512.png" />
 
-    <title>FreeText — Social, your way</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "FreeText",
+        "url": "https://freetext-app.vercel.app/",
+        "description": "Modern social networking, private messaging, stories, sharing and Boi Achiver AI.",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://freetext-app.vercel.app/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+
+    <title>FreeText</title>
   </head>
-
   <body>
     <div id="root"></div>
-
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
