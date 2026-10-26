@@ -39,7 +39,10 @@ function buildSystem(context: any) {
 async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResult> {
   // Vercel Node functions expose secrets through process.env. Never read the key from the browser.
   const apiKey = process.env.OPENAI_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
+  const configuredModel = process.env.OPENAI_MODEL?.trim();
+  const models = [configuredModel || "gpt-6-luna", "gpt-5.1", "gpt-5-mini"].filter(
+    (model, index, list) => model && list.indexOf(model) === index,
+  );
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured in the Vercel Production environment.");
@@ -47,52 +50,43 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
+  let lastModelError = "";
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        instructions: buildSystem(context),
-        input: messages.map((message) => ({
-          role: message.role,
-          content: [{ type: "input_text", text: message.content }],
-        })),
-        max_output_tokens: 450,
-      }),
-      signal: controller.signal,
-    });
+    for (const model of models) {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          instructions: buildSystem(context),
+          input: messages.map((message) => ({
+            role: message.role,
+            content: [{ type: "input_text", text: message.content }],
+          })),
+          max_output_tokens: 450,
+        }),
+        signal: controller.signal,
+      });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
-      if (response.status === 401 || response.status === 403) {
-        throw new Error("OpenAI rejected OPENAI_API_KEY. The Vercel key must be valid and have API access/billing enabled.");
-      }
-      if (response.status === 429) {
-        throw new Error("OpenAI is rate-limited or the API account has no available usage. Check API billing and limits.");
-      }
-      if (response.status === 404) {
-        throw new Error(`OpenAI model ${model} is not available to this API project.`);
-      }
-      throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
-    }
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const text = String(data?.output_text || "").trim();
+        const fallback = data?.output
+          ?.flatMap((item: any) => item?.content || [])
+          ?.filter((item: any) => item?.type === "output_text")
+          ?.map((item: any) => item?.text || "")
+          ?.join("\n")
+          ?.trim();
+        const finalText = text || fallback || "";
 
-    const text = String(data?.output_text || "").trim();
-    if (!text) {
-      const fallback = data?.output
-        ?.flatMap((item: any) => item?.content || [])
-        ?.filter((item: any) => item?.type === "output_text")
-        ?.map((item: any) => item?.text || "")
-        ?.join("\n")
-        ?.trim();
-      if (fallback) {
+        if (!finalText) throw new Error("OpenAI returned an empty response.");
+
         return {
-          text: fallback,
+          text: finalText,
           sources: [],
           online: true,
           liveSearch: false,
@@ -100,17 +94,25 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
           model,
         };
       }
-      throw new Error("OpenAI returned an empty response.");
+
+      const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("OpenAI rejected OPENAI_API_KEY. The Vercel key must be valid and have API access/billing enabled.");
+      }
+      if (response.status === 429) {
+        throw new Error("OpenAI is rate-limited or the API account has no available usage. Check API billing and limits.");
+      }
+
+      // A model can be unavailable to an API project. Try the next model before failing.
+      if ([400, 404, 422].includes(response.status)) {
+        lastModelError = `${model}: ${detail.slice(0, 180)}`;
+        continue;
+      }
+
+      throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
     }
 
-    return {
-      text,
-      sources: [],
-      online: true,
-      liveSearch: false,
-      provider: "OpenAI",
-      model,
-    };
+    throw new Error(`No configured OpenAI model is available. ${lastModelError}`.trim());
   } catch (error: any) {
     if (error?.name === "AbortError") {
       throw new Error("Boi Achiver AI timed out while waiting for OpenAI. Please try again.");
@@ -122,6 +124,8 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
