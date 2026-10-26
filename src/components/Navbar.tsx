@@ -25,11 +25,21 @@ function Avatar({ src, size = 36 }: { src: string; size?: number }) {
   return <img src={src} alt="Profile" className="avatar" style={{ width: size, height: size }} />;
 }
 
+function openMessagesInsideApp() {
+  const messageButton = document.querySelector<HTMLButtonElement>(".mobile-bottom-nav button[data-nav=messages]");
+  if (messageButton) {
+    messageButton.click();
+    return;
+  }
+  // Desktop fallback: keep navigation inside the current app instead of opening a new browser page.
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 export default function Navbar({ search, setSearch, darkMode, toggleDarkMode, openCreate, openNotifications, openProfile, profileAvatar, logout }: NavbarProps) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <button className="brand" onClick={openProfile} aria-label="Open profile" title="FreeText">
+        <button className="brand" onClick={() => setSearch("")} aria-label="Open FreeText home" title="FreeText">
           <span className="brand-icon"><MessageCircle size={22} /></span>
           <span>FreeText</span>
         </button>
@@ -40,7 +50,7 @@ export default function Navbar({ search, setSearch, darkMode, toggleDarkMode, op
         </div>
 
         <div className="top-actions">
-          <button className="icon-button" onClick={() => window.location.assign("/ai.html")} aria-label="Open Boi Achiver AI" title="Boi Achiver AI">
+          <button className="icon-button" onClick={openMessagesInsideApp} aria-label="Open Boi Achiver AI in Messages" title="Boi Achiver AI">
             <Bot size={21} />
           </button>
           <button className="icon-button modern-create" onClick={openCreate} aria-label="Create post" title="Create post"><Plus size={21} /></button>
