@@ -11,6 +11,9 @@ const RESEND_COOLDOWN = 120;
 
 const friendlyError = (message: string) => {
   const lower = message.toLowerCase();
+  if (lower.includes("bucket") && lower.includes("not found")) {
+    return "Photo storage is not ready yet. Run supabase/profile_media_bucket_fix.sql in the Supabase SQL Editor, then try your photo again.";
+  }
   if (lower.includes("email") && lower.includes("invalid")) {
     return "The email service rejected this address. Please check the address and try again.";
   }
@@ -41,10 +44,7 @@ export default function Auth() {
   const coverInput = useRef<HTMLInputElement>(null);
   const initialized = useRef(false);
 
-  const clearMessages = () => {
-    setError("");
-    setMessage("");
-  };
+  const clearMessages = () => { setError(""); setMessage(""); };
 
   const moveToProfile = () => {
     localStorage.removeItem(PENDING_VERIFICATION_KEY);
@@ -60,41 +60,30 @@ export default function Auth() {
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const verifiedRedirect = new URLSearchParams(window.location.search).get("verified") === "1";
       const pendingEmail = localStorage.getItem(PENDING_VERIFICATION_KEY);
-
       if (pendingEmail) setEmail(pendingEmail);
-
       if (verifiedRedirect) {
         await checkVerificationStatus();
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
-
       if (session?.user?.email_confirmed_at) setStep(3);
       else if (pendingEmail) setStep(2);
     };
-
     checkSession();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event) && session?.user?.email_confirmed_at) {
-        moveToProfile();
-      }
+      if (["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event) && session?.user?.email_confirmed_at) moveToProfile();
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
     if (step !== 2) return;
     const onFocus = () => void checkVerificationStatus();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void checkVerificationStatus();
-    };
+    const onVisibility = () => { if (document.visibilityState === "visible") void checkVerificationStatus(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
     const poll = window.setInterval(() => void checkVerificationStatus(), 3500);
@@ -107,9 +96,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
-    const timer = window.setInterval(() => {
-      setResendSeconds((current) => current > 0 ? current - 1 : 0);
-    }, 1000);
+    const timer = window.setInterval(() => setResendSeconds((current) => current > 0 ? current - 1 : 0), 1000);
     return () => window.clearInterval(timer);
   }, [resendSeconds]);
 
@@ -134,12 +121,8 @@ export default function Auth() {
     clearMessages();
     if (!validateCredentials()) return;
     setLoading(true);
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     setLoading(false);
-
     if (loginError) {
       if (loginError.message.toLowerCase().includes("email not confirmed")) {
         localStorage.setItem(PENDING_VERIFICATION_KEY, email.trim().toLowerCase());
@@ -150,7 +133,6 @@ export default function Auth() {
       setError(friendlyError(loginError.message));
       return;
     }
-
     if (data.session) {
       localStorage.removeItem(PENDING_VERIFICATION_KEY);
       setMessage("Welcome back to FreeText!");
@@ -167,12 +149,10 @@ export default function Auth() {
       options: { emailRedirectTo: VERIFICATION_REDIRECT },
     });
     setLoading(false);
-
     if (signupError) {
       setError(friendlyError(signupError.message));
       return;
     }
-
     if (data.session) {
       localStorage.removeItem(PENDING_VERIFICATION_KEY);
       setStep(3);
@@ -187,7 +167,6 @@ export default function Auth() {
   const resendVerification = async () => {
     clearMessages();
     if (resendSeconds > 0 || loading) return;
-
     const savedEmail = localStorage.getItem(PENDING_VERIFICATION_KEY);
     const verificationEmail = (email.trim() || savedEmail || "").toLowerCase();
     if (!verificationEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verificationEmail)) {
@@ -195,21 +174,14 @@ export default function Auth() {
       setStep(1);
       return;
     }
-
     setEmail(verificationEmail);
     setLoading(true);
-    const { error: resendError } = await supabase.auth.resend({
-      type: "signup",
-      email: verificationEmail,
-      options: { emailRedirectTo: VERIFICATION_REDIRECT },
-    });
+    const { error: resendError } = await supabase.auth.resend({ type: "signup", email: verificationEmail, options: { emailRedirectTo: VERIFICATION_REDIRECT } });
     setLoading(false);
-
     if (resendError) {
       setError(friendlyError(resendError.message));
       return;
     }
-
     localStorage.setItem(PENDING_VERIFICATION_KEY, verificationEmail);
     setMessage("A fresh verification link is on its way. Check your inbox and spam folder.");
     setResendSeconds(RESEND_COOLDOWN);
@@ -217,23 +189,12 @@ export default function Auth() {
 
   const selectImage = (file: File | undefined, type: "avatar" | "cover") => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setError("Please choose an image smaller than 8MB.");
-      return;
-    }
+    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
+    if (file.size > 8 * 1024 * 1024) { setError("Please choose an image smaller than 8MB."); return; }
     clearMessages();
     const url = URL.createObjectURL(file);
-    if (type === "avatar") {
-      setAvatarFile(file);
-      setAvatarPreview(url);
-    } else {
-      setCoverFile(file);
-      setCoverPreview(url);
-    }
+    if (type === "avatar") { setAvatarFile(file); setAvatarPreview(url); }
+    else { setCoverFile(file); setCoverPreview(url); }
   };
 
   const uploadImage = async (file: File, folder: string) => {
@@ -241,20 +202,14 @@ export default function Auth() {
     if (!user) throw new Error("Your session has expired. Please sign in again.");
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const path = `${folder}/${user.id}/${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("media").upload(path, file, {
-      upsert: true,
-      contentType: file.type,
-    });
+    const { error: uploadError } = await supabase.storage.from("media").upload(path, file, { upsert: true, contentType: file.type });
     if (uploadError) throw uploadError;
     return supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
   };
 
   const completeProfile = async () => {
     clearMessages();
-    if (!avatarFile && !coverFile) {
-      setError("Add at least a profile picture or cover photo to continue.");
-      return;
-    }
+    if (!avatarFile && !coverFile) { setError("Add at least a profile picture or cover photo to continue."); return; }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -263,25 +218,16 @@ export default function Auth() {
       const avatarUrl = avatarFile ? await uploadImage(avatarFile, "profiles/avatar") : (existing.data?.avatar_url || "");
       const coverUrl = coverFile ? await uploadImage(coverFile, "profiles/cover") : (existing.data?.cover_url || "");
       const fallbackName = (user.user_metadata?.full_name || user.email?.split("@")[0] || "FreeText User").trim();
-      const fallbackUsername = (user.user_metadata?.username || user.email?.split("@")[0] || `user${user.id.slice(0, 8)}`)
-        .replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().slice(0, 30) || `user${user.id.slice(0, 8)}`;
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        username: existing.data?.username || fallbackUsername,
-        full_name: existing.data?.full_name || fallbackName,
-        bio: "",
-        avatar_url: avatarUrl,
-        cover_url: coverUrl,
-      });
+      const fallbackUsername = (user.user_metadata?.username || user.email?.split("@")[0] || `user${user.id.slice(0, 8)}`).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().slice(0, 30) || `user${user.id.slice(0, 8)}`;
+      const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, username: existing.data?.username || fallbackUsername, full_name: existing.data?.full_name || fallbackName, bio: "", avatar_url: avatarUrl, cover_url: coverUrl });
       if (profileError) throw profileError;
       localStorage.removeItem(PENDING_VERIFICATION_KEY);
       setMessage("Your profile is ready. Welcome to FreeText!");
       window.setTimeout(() => window.location.reload(), 700);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "We couldn't finish your profile. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      const message = e instanceof Error ? e.message : "We couldn't finish your profile. Please try again.";
+      setError(friendlyError(message));
+    } finally { setLoading(false); }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -291,80 +237,34 @@ export default function Auth() {
   };
 
   if (step === 2) return (
-    <main className="auth-page">
-      <style>{verificationStyles}</style>
-      <section className="auth-card verification-card">
-        <div className="verification-visual">
-          <div className="verify-scene">
-            <div className="verify-mail"><Mail size={30}/></div>
-            <div className="verify-arrow"/>
-            <div className="verify-inbox"><Inbox size={31}/><div className="verify-check"><Check size={16}/></div></div>
-          </div>
-        </div>
-        <div className="verification-badge"><ShieldCheck size={14}/> Secure email verification</div>
-        <h1>Check your email</h1>
-        <p className="auth-subtitle verification-lead">Tap the FreeText verification link. When you return, we'll detect it automatically.</p>
-        <div className="verification-email-box"><Mail size={17}/><strong>{email}</strong></div>
-        <div className="auto-check"><span className="live-dot"/> Waiting for verification automatically</div>
-        <div className="verification-steps">
-          <div className="verification-step"><span>1</span><p>Open the email</p></div>
-          <div className="verification-step"><span>2</span><p>Tap verify</p></div>
-          <div className="verification-step"><span>3</span><p>Return to FreeText</p></div>
-        </div>
-        {message && <div className="auth-message">{message}</div>}
-        {error && <div className="auth-error">{error}</div>}
-        <div className="verification-resend-box">
-          <div className="verification-resend-copy"><strong>Didn't receive it?</strong><span>Check spam or junk, then request another link.</span></div>
-          <button className="verification-resend-button" type="button" onClick={resendVerification} disabled={resendSeconds > 0 || loading}>
-            <RefreshCw size={14}/>{resendSeconds > 0 ? `${resendSeconds}s` : "Resend"}
-          </button>
-        </div>
-        <button className="auth-back-button" type="button" onClick={() => {
-          clearMessages();
-          localStorage.removeItem(PENDING_VERIFICATION_KEY);
-          setStep(1);
-        }}><ArrowLeft size={15}/> Back to sign in</button>
-      </section>
-    </main>
+    <main className="auth-page"><style>{verificationStyles}</style><section className="auth-card verification-card">
+      <div className="verification-visual"><div className="verify-scene"><div className="verify-mail"><Mail size={30}/></div><div className="verify-arrow"/><div className="verify-inbox"><Inbox size={31}/><div className="verify-check"><Check size={16}/></div></div></div></div>
+      <div className="verification-badge"><ShieldCheck size={14}/> Secure email verification</div><h1>Check your email</h1>
+      <p className="auth-subtitle verification-lead">Tap the FreeText verification link. When you return, we'll detect it automatically.</p>
+      <div className="verification-email-box"><Mail size={17}/><strong>{email}</strong></div><div className="auto-check"><span className="live-dot"/> Waiting for verification automatically</div>
+      <div className="verification-steps"><div className="verification-step"><span>1</span><p>Open the email</p></div><div className="verification-step"><span>2</span><p>Tap verify</p></div><div className="verification-step"><span>3</span><p>Return to FreeText</p></div></div>
+      {message && <div className="auth-message">{message}</div>}{error && <div className="auth-error">{error}</div>}
+      <div className="verification-resend-box"><div className="verification-resend-copy"><strong>Didn't receive it?</strong><span>Check spam or junk, then request another link.</span></div><button className="verification-resend-button" type="button" onClick={resendVerification} disabled={resendSeconds > 0 || loading}><RefreshCw size={14}/>{resendSeconds > 0 ? `${resendSeconds}s` : "Resend"}</button></div>
+      <button className="auth-back-button" type="button" onClick={() => { clearMessages(); localStorage.removeItem(PENDING_VERIFICATION_KEY); setStep(1); }}><ArrowLeft size={15}/> Back to sign in</button>
+    </section></main>
   );
 
   if (step === 3) return (
-    <main className="auth-page">
-      <style>{profileStyles}</style>
-      <section className="auth-card profile-setup-card">
-        <div className="profile-setup-top"><div className="profile-sparkle"><Sparkles size={20}/></div><span>Almost there</span></div>
-        <h1>Make your profile yours</h1>
-        <p className="auth-subtitle">Add a profile picture and cover photo. You can change them anytime.</p>
-        <div className="profile-preview" style={{ backgroundImage: coverPreview ? `url(${coverPreview})` : undefined }}>
-          {!coverPreview && <div className="cover-placeholder"><ImageIcon size={28}/><span>Add cover photo</span></div>}
-          {coverPreview && <button className="remove-cover" type="button" onClick={() => { setCoverFile(null); setCoverPreview(""); }} aria-label="Remove cover"><X size={15}/></button>}
-          <div className="avatar-wrap"><div className="avatar-preview">{avatarPreview ? <img src={avatarPreview} alt="Profile preview"/> : <UserRound size={42}/>}</div><button className="avatar-edit" type="button" onClick={() => avatarInput.current?.click()} aria-label="Add profile picture"><Camera size={16}/></button></div>
-          <div className="profile-name-preview">Your profile</div>
-        </div>
-        <input ref={avatarInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "avatar")}/>
-        <input ref={coverInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "cover")}/>
-        <div className="photo-options"><button type="button" className="photo-option" onClick={() => avatarInput.current?.click()}><span><Camera size={19}/></span><strong>Profile picture</strong><small>{avatarFile ? "Photo selected" : "Add your face or favorite photo"}</small>{avatarFile && <CheckCircle2 size={17} className="selected-check"/>}</button><button type="button" className="photo-option" onClick={() => coverInput.current?.click()}><span><ImageIcon size={19}/></span><strong>Cover photo</strong><small>{coverFile ? "Photo selected" : "Show your style"}</small>{coverFile && <CheckCircle2 size={17} className="selected-check"/>}</button></div>
-        {message && <div className="auth-message">{message}</div>}
-        {error && <div className="auth-error">{error}</div>}
-        <button className="auth-primary-button profile-finish" type="button" onClick={completeProfile} disabled={loading}>{loading ? <><RefreshCw size={17} className="spin"/> Setting up your profile...</> : <><Sparkles size={17}/> Finish profile</>}</button>
-        <p className="profile-note"><ShieldCheck size={14}/> Your photos are private to your account until you choose to share them.</p>
-      </section>
-    </main>
+    <main className="auth-page"><style>{profileStyles}</style><section className="auth-card profile-setup-card">
+      <div className="profile-setup-top"><div className="profile-sparkle"><Sparkles size={20}/></div><span>Almost there</span></div><h1>Make your profile yours</h1>
+      <p className="auth-subtitle">Add a profile picture and cover photo. You can change them anytime.</p>
+      <div className="profile-preview" style={{ backgroundImage: coverPreview ? `url(${coverPreview})` : undefined }}>{!coverPreview && <div className="cover-placeholder"><ImageIcon size={28}/><span>Add cover photo</span></div>}{coverPreview && <button className="remove-cover" type="button" onClick={() => { setCoverFile(null); setCoverPreview(""); }} aria-label="Remove cover"><X size={15}/></button>}<div className="avatar-wrap"><div className="avatar-preview">{avatarPreview ? <img src={avatarPreview} alt="Profile preview"/> : <UserRound size={42}/>}</div><button className="avatar-edit" type="button" onClick={() => avatarInput.current?.click()} aria-label="Add profile picture"><Camera size={16}/></button></div><div className="profile-name-preview">Your profile</div></div>
+      <input ref={avatarInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "avatar")}/><input ref={coverInput} className="hidden-input" type="file" accept="image/*" onChange={(e) => selectImage(e.target.files?.[0], "cover")}/>
+      <div className="photo-options"><button type="button" className="photo-option" onClick={() => avatarInput.current?.click()}><span><Camera size={19}/></span><strong>Profile picture</strong><small>{avatarFile ? "Photo selected" : "Add your face or favorite photo"}</small>{avatarFile && <CheckCircle2 size={17} className="selected-check"/>}</button><button type="button" className="photo-option" onClick={() => coverInput.current?.click()}><span><ImageIcon size={19}/></span><strong>Cover photo</strong><small>{coverFile ? "Photo selected" : "Show your style"}</small>{coverFile && <CheckCircle2 size={17} className="selected-check"/>}</button></div>
+      {message && <div className="auth-message">{message}</div>}{error && <div className="auth-error">{error}</div>}
+      <button className="auth-primary-button profile-finish" type="button" onClick={completeProfile} disabled={loading}>{loading ? <><RefreshCw size={17} className="spin"/> Setting up your profile...</> : <><Sparkles size={17}/> Finish profile</>}</button>
+      <p className="profile-note"><ShieldCheck size={14}/> Your photos are private to your account until you choose to share them.</p>
+    </section></main>
   );
 
   return (
-    <main className="auth-page"><style>{baseStyles}</style><section className="auth-card">
-      <div className="brand-mark"><span>F</span></div><div className="brand-label">FreeText</div>
-      <h1>{mode === "login" ? "Welcome back" : "Join FreeText"}</h1>
-      <p className="auth-subtitle">{mode === "login" ? "Sign in to continue to your social world." : "Create your account in seconds. We'll help you finish your profile next."}</p>
-      {message && <div className="auth-message">{message}</div>}{error && <div className="auth-error">{error}</div>}
-      <form onSubmit={submit}>
-        <label>Email address</label><div className="input-wrap"><Mail size={17}/><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></div>
-        <label>Password</label><div className="input-wrap"><Lock size={17}/><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete={mode === "login" ? "current-password" : "new-password"}/><button type="button" className="icon-button" onClick={() => setShowPassword((v) => !v)} aria-label="Show password">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div>
-        <button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}</button>
-      </form>
-      <div className="auth-divider"><span>or</span></div>
-      <button className="mode-switch" type="button" onClick={() => { clearMessages(); setMode(mode === "login" ? "signup" : "login"); }}>{mode === "login" ? "New to FreeText? Create an account" : "Already have an account? Sign in"}</button>
+    <main className="auth-page"><style>{baseStyles}</style><section className="auth-card"><div className="brand-mark"><span>F</span></div><div className="brand-label">FreeText</div><h1>{mode === "login" ? "Welcome back" : "Join FreeText"}</h1><p className="auth-subtitle">{mode === "login" ? "Sign in to continue to your social world." : "Create your account in seconds. We'll help you finish your profile next."}</p>
+      {message && <div className="auth-message">{message}</div>}{error && <div className="auth-error">{error}</div>}<form onSubmit={submit}><label>Email address</label><div className="input-wrap"><Mail size={17}/><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/></div><label>Password</label><div className="input-wrap"><Lock size={17}/><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete={mode === "login" ? "current-password" : "new-password"}/><button type="button" className="icon-button" onClick={() => setShowPassword((v) => !v)} aria-label="Show password">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div><button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}</button></form><div className="auth-divider"><span>or</span></div><button className="mode-switch" type="button" onClick={() => { clearMessages(); setMode(mode === "login" ? "signup" : "login"); }}>{mode === "login" ? "New to FreeText? Create an account" : "Already have an account? Sign in"}</button>
     </section></main>
   );
 }
