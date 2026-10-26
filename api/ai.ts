@@ -36,11 +36,53 @@ function buildSystem(context: any) {
   ].join("\n\n");
 }
 
+function extractResponseText(data: any) {
+  const direct = String(data?.output_text || "").trim();
+  if (direct) return direct;
+
+  const fallback = data?.output
+    ?.flatMap((item: any) => item?.content || [])
+    ?.filter((item: any) => item?.type === "output_text")
+    ?.map((item: any) => item?.text || "")
+    ?.join("\n")
+    ?.trim();
+
+  return String(fallback || "").trim();
+}
+
+async function runChatCompletions(model: string, messages: ChatMessage[], context: any, apiKey: string, signal: AbortSignal) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: buildSystem(context) },
+        ...messages,
+      ],
+      max_completion_tokens: 450,
+    }),
+    signal,
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
+    throw Object.assign(new Error(detail.slice(0, 240)), { status: response.status });
+  }
+
+  const text = String(data?.choices?.[0]?.message?.content || "").trim();
+  if (!text) throw new Error("OpenAI returned an empty response.");
+  return text;
+}
+
 async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResult> {
-  // Vercel Node functions expose secrets through process.env. Never read the key from the browser.
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   const configuredModel = process.env.OPENAI_MODEL?.trim();
-  const models = [configuredModel || "gpt-6-luna", "gpt-5.1", "gpt-5-mini"].filter(
+  const models = [configuredModel || "gpt-6-luna", "gpt-6.1-sol", "gpt-5.6-sol"].filter(
     (model, index, list) => model && list.indexOf(model) === index,
   );
 
@@ -74,15 +116,7 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
 
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        const text = String(data?.output_text || "").trim();
-        const fallback = data?.output
-          ?.flatMap((item: any) => item?.content || [])
-          ?.filter((item: any) => item?.type === "output_text")
-          ?.map((item: any) => item?.text || "")
-          ?.join("\n")
-          ?.trim();
-        const finalText = text || fallback || "";
-
+        const finalText = extractResponseText(data);
         if (!finalText) throw new Error("OpenAI returned an empty response.");
 
         return {
@@ -90,7 +124,7 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
           sources: [],
           online: true,
           liveSearch: false,
-          provider: "OpenAI",
+          provider: "OpenAI Responses API",
           model,
         };
       }
@@ -103,13 +137,27 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
         throw new Error("OpenAI is rate-limited or the API account has no available usage. Check API billing and limits.");
       }
 
-      // A model can be unavailable to an API project. Try the next model before failing.
-      if ([400, 404, 422].includes(response.status)) {
-        lastModelError = `${model}: ${detail.slice(0, 180)}`;
-        continue;
-      }
+      lastModelError = `${model}: ${detail.slice(0, 180)}`;
 
-      throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
+      // Some API projects/models can reject a Responses request while still
+      // allowing the same model through Chat Completions. Try that before
+      // moving to another model.
+      if ([400, 404, 422].includes(response.status)) {
+        try {
+          const text = await runChatCompletions(model, messages, context, apiKey, controller.signal);
+          return {
+            text,
+            sources: [],
+            online: true,
+            liveSearch: false,
+            provider: "OpenAI Chat Completions API",
+            model,
+          };
+        } catch (chatError: any) {
+          lastModelError = `${model}: ${String(chatError?.message || detail).slice(0, 180)}`;
+          continue;
+        }
+      }
     }
 
     throw new Error(`No configured OpenAI model is available. ${lastModelError}`.trim());
@@ -125,6 +173,15 @@ async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResul
 
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
+
+  if (req.method === "GET") {
+    return res.status(200).json({
+      online: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      provider: "OpenAI",
+      configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      model: process.env.OPENAI_MODEL?.trim() || "gpt-6-luna",
+    });
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -145,7 +202,7 @@ export default async function handler(req: any, res: any) {
     const message = String(error?.message || "");
     return res.status(502).json({
       online: false,
-      error: message || "Boi Achiver AI is temporarily unavailable. Please try again.",
+      error: message || "Boi Achiever AI is temporarily unavailable. Please try again.",
     });
   }
 }
