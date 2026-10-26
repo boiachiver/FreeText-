@@ -26,12 +26,11 @@ function Avatar({ src, size = 36 }: { src: string; size?: number }) {
 }
 
 function openMessagesInsideApp() {
-  const messageButton = document.querySelector<HTMLButtonElement>(".mobile-bottom-nav button[data-nav=messages]");
+  const messageButton = document.querySelector<HTMLButtonElement>(".mobile-bottom-nav button:nth-child(4)");
   if (messageButton) {
     messageButton.click();
     return;
   }
-  // Desktop fallback: keep navigation inside the current app instead of opening a new browser page.
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
