@@ -37,55 +37,88 @@ function buildSystem(context: any) {
 }
 
 async function runOpenAI(messages: ChatMessage[], context: any): Promise<AIResult> {
-  const apiKey = (globalThis as any).process?.env?.OPENAI_API_KEY as string | undefined;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured in Vercel Production.");
+  // Vercel Node functions expose secrets through process.env. Never read the key from the browser.
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-6-luna",
-      instructions: buildSystem(context),
-      input: messages.map((message) => ({
-        role: message.role,
-        content: [{ type: "input_text", text: message.content }],
-      })),
-      max_output_tokens: 450,
-    }),
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("OpenAI rejected OPENAI_API_KEY. Check that the key is valid and has API billing/access enabled.");
-    }
-    if (response.status === 429) {
-      throw new Error("OpenAI is rate-limited or the API account has no available usage. Please check API billing/limits.");
-    }
-    throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured in the Vercel Production environment.");
   }
 
-  const text = String(
-    data?.output_text ||
-      data?.output?.flatMap((item: any) => item?.content || [])
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        instructions: buildSystem(context),
+        input: messages.map((message) => ({
+          role: message.role,
+          content: [{ type: "input_text", text: message.content }],
+        })),
+        max_output_tokens: 450,
+      }),
+      signal: controller.signal,
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = String(data?.error?.message || data?.message || `HTTP ${response.status}`);
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("OpenAI rejected OPENAI_API_KEY. The Vercel key must be valid and have API access/billing enabled.");
+      }
+      if (response.status === 429) {
+        throw new Error("OpenAI is rate-limited or the API account has no available usage. Check API billing and limits.");
+      }
+      if (response.status === 404) {
+        throw new Error(`OpenAI model ${model} is not available to this API project.`);
+      }
+      throw new Error(`OpenAI request failed: ${detail.slice(0, 240)}`);
+    }
+
+    const text = String(data?.output_text || "").trim();
+    if (!text) {
+      const fallback = data?.output
+        ?.flatMap((item: any) => item?.content || [])
+        ?.filter((item: any) => item?.type === "output_text")
         ?.map((item: any) => item?.text || "")
-        ?.join(" ") || "",
-  ).trim();
+        ?.join("\n")
+        ?.trim();
+      if (fallback) {
+        return {
+          text: fallback,
+          sources: [],
+          online: true,
+          liveSearch: false,
+          provider: "OpenAI",
+          model,
+        };
+      }
+      throw new Error("OpenAI returned an empty response.");
+    }
 
-  if (!text) throw new Error("OpenAI returned an empty response.");
-
-  return {
-    text,
-    sources: [],
-    online: true,
-    liveSearch: false,
-    provider: "OpenAI",
-    model: "gpt-6-luna",
-  };
+    return {
+      text,
+      sources: [],
+      online: true,
+      liveSearch: false,
+      provider: "OpenAI",
+      model,
+    };
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new Error("Boi Achiver AI timed out while waiting for OpenAI. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export default async function handler(req: any, res: any) {
