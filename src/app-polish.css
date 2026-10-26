@@ -1,0 +1,128 @@
+/* FreeText app-shell polish: keep the experience inside the site. */
+.app-shell {
+  min-height: 100vh;
+  padding-bottom: 82px;
+}
+
+/* The mobile navigation is the primary app navigation. */
+.mobile-bottom-nav {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 120;
+  min-height: 62px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(220, 226, 235, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+html.dark .mobile-bottom-nav {
+  background: rgba(18, 24, 33, 0.96);
+  border-color: #293444;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.38);
+}
+
+.mobile-bottom-nav button {
+  width: 48px;
+  height: 46px;
+  min-width: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: transparent;
+  color: #64748b;
+  font-size: 21px;
+  transition: transform .16s ease, background .16s ease, color .16s ease;
+}
+
+.mobile-bottom-nav button span {
+  display: none;
+}
+
+.mobile-bottom-nav button.active {
+  background: #e8efff;
+  color: #2563eb;
+}
+
+html.dark .mobile-bottom-nav button {
+  color: #94a3b8;
+}
+
+html.dark .mobile-bottom-nav button.active {
+  background: #182d52;
+  color: #75a5ff;
+}
+
+.mobile-bottom-nav button:active {
+  transform: scale(.92);
+}
+
+/* Avoid browser-like top controls on phones. */
+@media (max-width: 760px) {
+  .topbar {
+    height: 62px;
+  }
+
+  .topbar-inner {
+    width: calc(100% - 20px);
+    gap: 10px;
+  }
+
+  .brand > span:last-child {
+    display: none;
+  }
+
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .search-box {
+    max-width: none;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .top-actions {
+    display: none;
+  }
+
+  .main-content {
+    padding: 14px 0 88px;
+  }
+
+  .page-section,
+  .feed {
+    width: 100%;
+  }
+
+  .stories-card,
+  .post-card,
+  .messages-whatsapp,
+  .profile-card {
+    border-radius: 18px;
+  }
+}
+
+/* Make interactive pages feel like native in-app screens. */
+.modal-backdrop {
+  padding-bottom: 88px;
+}
+
+@media (min-width: 761px) {
+  .mobile-bottom-nav {
+    display: none;
+  }
+
+  .app-shell {
+    padding-bottom: 0;
+  }
+}
