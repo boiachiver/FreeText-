@@ -1,8 +1,8 @@
-import { Edit3, ShieldCheck } from "lucide-react";
+import { Edit3, LogOut, ShieldCheck } from "lucide-react";
 
-type ProfileProps = { profile: any; onEdit: () => void };
+type ProfileProps = { profile: any; onEdit: () => void; onLogout: () => void };
 
-export default function Profile({ profile, onEdit }: ProfileProps) {
+export default function Profile({ profile, onEdit, onLogout }: ProfileProps) {
   const name = profile?.full_name || profile?.username || "FreeText user";
   const username = profile?.username || "user";
   const avatar = profile?.avatar_url || "https://i.pravatar.cc/150?u=" + (profile?.id || "freetext");
@@ -17,6 +17,12 @@ export default function Profile({ profile, onEdit }: ProfileProps) {
         </div>
       </div>
       <div className="profile-stats modern-profile-stats"><div><strong>FreeText</strong><span>Community member</span></div></div>
+      <div style={{ padding: "0 28px 24px" }}>
+        <button type="button" onClick={onLogout} aria-label="Log out of FreeText" style={{ width: "100%", minHeight: 46, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, background: "#f3f4f6", color: "#dc2626", fontWeight: 700 }}>
+          <LogOut size={18} />
+          Log out
+        </button>
+      </div>
     </div>
   </section>;
 }
