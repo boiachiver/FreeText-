@@ -1,10 +1,15 @@
--- FreeText private message media storage.
--- Run after schema.sql and e2ee.sql in the Supabase SQL editor.
--- The bucket is private. Objects are scoped to authenticated users and conversation membership.
+-- FreeText real private Supabase Storage for message photos/videos.
+-- Run this once in Supabase SQL Editor after schema.sql / e2ee.sql.
 
-insert into storage.buckets (id, name, public)
-values ('message-media', 'message-media', false)
-on conflict (id) do update set public = false;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'message-media', 'message-media', false, 52428800,
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','video/quicktime']
+)
+on conflict (id) do update set
+  public = false,
+  file_size_limit = 52428800,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 alter table public.messages add column if not exists attachment_path text;
 alter table public.messages add column if not exists attachment_name text;
@@ -13,7 +18,7 @@ alter table public.messages add column if not exists attachment_size bigint;
 
 create index if not exists messages_attachment_path_idx on public.messages(attachment_path) where attachment_path is not null;
 
--- Uploads must live under <sender-user-id>/<conversation-id>/<message-id>-<safe-file-name>.
+-- Upload path: <sender-user-id>/<conversation-id>/<message-id>-<safe-file-name>
 drop policy if exists message_media_insert on storage.objects;
 create policy message_media_insert
 on storage.objects for insert to authenticated
