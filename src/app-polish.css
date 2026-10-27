@@ -66,4 +66,7 @@ html:not(.dark) .chat-screen{background:#fff!important;color:#172033}
 /* Profile / settings surfaces */
 html.dark .profile-card,html.dark .page-section{color:#f5f5f5}
 
+/* Hide the old profile-loading message while the app finishes loading. */
+.auth-page > .auth-card > .auth-logo + h1 + .auth-subtitle{display:none}
+
 @media(min-width:761px){.mobile-bottom-nav{display:none}.app-shell{padding-bottom:0}}
