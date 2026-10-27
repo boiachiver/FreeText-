@@ -20,16 +20,22 @@ type PostCardProps = {
   onSave: (id: string) => void;
   onComment?: (post: Post) => void;
   onShare?: (post: Post) => void;
+  onMessage?: (person: { name: string; username: string; avatar: string }) => void;
 };
 
 function Avatar({ src, size = 44 }: { src: string; size?: number }) {
   return <img src={src} alt="avatar" className="avatar" style={{ width: size, height: size }} />;
 }
 
-export default function PostCard({ post, onLike, onSave, onComment, onShare }: PostCardProps) {
+export default function PostCard({ post, onLike, onSave, onComment, onShare, onMessage }: PostCardProps) {
+  const openChat = () => onMessage?.({ name: post.name, username: post.username, avatar: post.avatar });
+
   return <article className="post-card">
     <div className="post-header">
-      <div className="user-info"><Avatar src={post.avatar} size={44} /><div><strong>{post.name}</strong><span>@{post.username} · {post.time}</span></div></div>
+      <button className="user-info post-profile-link" onClick={openChat} aria-label={`Message ${post.name}`} type="button">
+        <Avatar src={post.avatar} size={44} />
+        <span><strong>{post.name}</strong><span>@{post.username} · {post.time}</span></span>
+      </button>
       <button className="more-button" aria-label="More post options"><MoreHorizontal size={20} /></button>
     </div>
     <p className="post-caption">{post.caption}</p>
