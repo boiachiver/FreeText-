@@ -1,15 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#07111f" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#05060a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
 
     <title>FreeText — Connect, Share & Chat</title>
-    <meta
-      name="description"
-      content="FreeText is a modern social platform for connecting with friends, sharing posts and stories, messaging, and using Boi Achiver AI."
-    />
+    <meta name="description" content="FreeText is a modern social platform for connecting with friends, sharing posts and stories, messaging, and using Boi Achiver AI." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="google-site-verification" content="PDlH0WpCHYRh6MJdAIfc-Z5yNHQ07ySPgRlX_7Qlxuc" />
@@ -26,23 +25,87 @@
     <meta name="twitter:description" content="A modern social experience with private messaging and Boi Achiver AI." />
     <meta name="twitter:image" content="https://freetext-app.vercel.app/icons/icon-512.png" />
 
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "FreeText",
-        "url": "https://freetext-app.vercel.app/",
-        "description": "Modern social networking, private messaging, stories, sharing and Boi Achiver AI.",
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": "https://freetext-app.vercel.app/?q={search_term_string}",
-          "query-input": "required name=search_term_string"
-        }
-      }
-    </script>
+    <style>
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { margin: 0; min-height: 100%; background: #05060a; }
+      body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; }
+      #root { min-height: 100vh; }
+      #freetext-splash { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #05060a; color: white; transition: opacity .65s ease, visibility .65s ease; }
+      #freetext-splash.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+      .ft-blob { position: absolute; width: 360px; height: 360px; border-radius: 50%; filter: blur(100px); opacity: .25; pointer-events: none; }
+      .ft-blob.one { top: -150px; left: -140px; background: #4f46e5; }
+      .ft-blob.two { right: -140px; bottom: -150px; background: #9333ea; }
+      .ft-blob.three { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; height: 420px; background: #6366f1; opacity: .1; }
+      .ft-center { position: relative; z-index: 2; width: min(92vw, 430px); padding: 24px; text-align: center; }
+      .ft-logo-wrap { position: relative; width: 112px; height: 112px; margin: 0 auto 28px; display: grid; place-items: center; animation: ft-up .7s cubic-bezier(.16,1,.3,1) both; }
+      .ft-ring { position: absolute; inset: 0; border: 3px solid rgba(99,102,241,.2); border-top-color: #6366f1; border-radius: 50%; animation: ft-spin 2.2s linear infinite; }
+      .ft-logo { width: 78px; height: 78px; border-radius: 24px; display: grid; place-items: center; background: linear-gradient(135deg,#4f46e5,#818cf8); box-shadow: 0 0 50px rgba(79,70,229,.45); animation: ft-pulse 2.2s ease-in-out infinite; }
+      .ft-logo svg { width: 36px; height: 36px; fill: white; }
+      .ft-orbit { position: absolute; inset: 0; animation: ft-spin 3.6s linear infinite; }
+      .ft-orbit span { position: absolute; top: 7px; left: 50%; width: 7px; height: 7px; border-radius: 50%; background: #818cf8; }
+      .ft-orbit span:nth-child(2) { top: auto; left: auto; right: 10px; bottom: 28px; background: #c084fc; }
+      .ft-orbit span:nth-child(3) { top: 30px; left: auto; right: 7px; background: #f472b6; }
+      .ft-title { margin: 0; font-size: clamp(32px, 9vw, 46px); line-height: 1; font-weight: 900; letter-spacing: -.04em; background: linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#c084fc,#818cf8); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: ft-shimmer 3.2s linear infinite, ft-up .7s .15s cubic-bezier(.16,1,.3,1) both; }
+      .ft-tagline { margin: 12px 0 0; color: #737b8c; font-size: 11px; letter-spacing: .24em; text-transform: uppercase; animation: ft-up .7s .25s cubic-bezier(.16,1,.3,1) both; }
+      .ft-progress { width: min(280px,80vw); height: 4px; margin: 32px auto 0; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); animation: ft-up .7s .35s cubic-bezier(.16,1,.3,1) both; }
+      .ft-progress i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#4f46e5,#8b5cf6,#ec4899); animation: ft-fill 2.5s cubic-bezier(.4,0,.2,1) forwards; }
+      .ft-status { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 15px; color: #656d7c; font-size: 11px; animation: ft-up .7s .45s cubic-bezier(.16,1,.3,1) both; }
+      .ft-dots { display: flex; gap: 4px; }
+      .ft-dots b { width: 6px; height: 6px; border-radius: 50%; background: #818cf8; animation: ft-dot 1.2s infinite ease-in-out; }
+      .ft-dots b:nth-child(2) { background: #c084fc; animation-delay: .15s; }
+      .ft-dots b:nth-child(3) { background: #f472b6; animation-delay: .3s; }
+      #ft-continue { opacity: 0; transform: translateY(10px); pointer-events: none; margin-top: 34px; padding: 13px 25px; border: 0; border-radius: 16px; color: white; font: 700 13px inherit; background: linear-gradient(90deg,#4f46e5,#6366f1); box-shadow: 0 16px 35px rgba(79,70,229,.28); cursor: pointer; transition: opacity .4s ease, transform .4s ease, scale .2s ease; }
+      #ft-continue.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+      #ft-continue:active { scale: .97; }
+      .ft-version { margin-top: 11px; color: #3f4653; font-size: 9px; }
+      .ft-footer { position: absolute; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); z-index: 2; text-align: center; color: #3f4653; font-size: 10px; }
+      .ft-footer strong { color: #6366f1; }
+      @keyframes ft-spin { to { transform: rotate(360deg); } }
+      @keyframes ft-pulse { 0%,100% { box-shadow: 0 0 35px rgba(79,70,229,.35); } 50% { box-shadow: 0 0 0 20px rgba(79,70,229,0), 0 0 55px rgba(99,102,241,.5); } }
+      @keyframes ft-shimmer { to { background-position: 200% center; } }
+      @keyframes ft-fill { to { width: 100%; } }
+      @keyframes ft-dot { 0%,80%,100% { transform: scale(.55); opacity:.4; } 40% { transform: scale(1); opacity:1; } }
+      @keyframes ft-up { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <div id="freetext-splash" aria-label="FreeText loading screen">
+      <div class="ft-blob one"></div><div class="ft-blob two"></div><div class="ft-blob three"></div>
+      <main class="ft-center">
+        <div class="ft-logo-wrap">
+          <div class="ft-orbit"><span></span><span></span><span></span></div>
+          <div class="ft-ring"></div>
+          <div class="ft-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M13.2 2 4 13h6.2L8.8 22 20 9.1h-6.5L13.2 2Z"/></svg>
+          </div>
+        </div>
+        <h1 class="ft-title">FreeText</h1>
+        <p class="ft-tagline">Chat · Status · Calls · AI</p>
+        <div class="ft-progress"><i></i></div>
+        <div class="ft-status"><span>Initializing FreeText</span><span class="ft-dots"><b></b><b></b><b></b></span></div>
+        <button id="ft-continue" type="button">Continue to FreeText <span aria-hidden="true">→</span></button>
+        <div class="ft-version">Your social world · v3.2</div>
+      </main>
+      <footer class="ft-footer">Made with <strong>⚡</strong> by Boi Achiver</footer>
+    </div>
+
+    <script>
+      (function () {
+        const splash = document.getElementById('freetext-splash');
+        const button = document.getElementById('ft-continue');
+        const reveal = () => button.classList.add('show');
+        setTimeout(reveal, 2500);
+        setTimeout(reveal, 4500);
+        button.addEventListener('click', () => {
+          splash.classList.add('is-hidden');
+          setTimeout(() => { splash.style.display = 'none'; }, 700);
+        });
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
