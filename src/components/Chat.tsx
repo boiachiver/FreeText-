@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, Code2, Drama, Lightbulb, MessageCircle, MoreVertical, Music2, Plus, Send, Sparkles, Video, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, BookOpen, Code2, Drama, Lightbulb, MessageCircle, Music2, Plus, Send, Sparkles, Video, X, Lock } from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { decryptMessage, encryptForConversation, ensureIdentity, isEncryptedMessage } from "../lib/e2ee";
 
 type Person = { id?: string; name: string; username: string; avatar: string };
 type Message = { id: string; text: string; sender: "me" | "them"; time: string };
 type ChatProps = { person: Person; messages: Message[]; onSendMessage: (text: string) => void; onBack: () => void };
+type DbMessage = { id: string; body: string | null; ciphertext: string | null; iv: string | null; encrypted_keys: Record<string, string> | null; sender_id: string; created_at: string };
 
 const AI_ID = "boi-achiever-ai";
 const AI_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%236d5dfc'/%3E%3Cstop offset='1' stop-color='%2300d4ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='120' height='120' rx='60' fill='%230b1020'/%3E%3Ccircle cx='60' cy='60' r='46' fill='url(%23g)'/%3E%3Cpath d='M39 51c0-8 7-15 15-15h13c8 0 14 7 14 15v18c0 8-6 15-14 15H55c-8 0-16-7-16-15z' fill='white' opacity='.96'/%3E%3Ccircle cx='52' cy='60' r='4' fill='%236d5dfc'/%3E%3Ccircle cx='69' cy='60' r='4' fill='%2300a9d6'/%3E%3Cpath d='M50 71c6 5 14 5 20 0' fill='none' stroke='%236d5dfc' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E";
@@ -21,11 +24,16 @@ const tools = [
 
 const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-export default function Chat({ person, messages, onSendMessage, onBack }: ChatProps) {
+export default function Chat({ person, messages: initialMessages, onSendMessage, onBack }: ChatProps) {
   const [text, setText] = useState("");
   const [aiTool, setAiTool] = useState("chat");
   const [aiMessages, setAiMessages] = useState<Message[]>([]);
+  const [chatMessages, setChatMessages] = useState<Message[]>(initialMessages);
   const [aiBusy, setAiBusy] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [secureReady, setSecureReady] = useState(false);
+  const [secureError, setSecureError] = useState("");
   const isAI = person.id === AI_ID || person.username === AI_ID;
   const activeTool = useMemo(() => tools.find(t => t.id === aiTool) || tools[0], [aiTool]);
 
@@ -36,6 +44,91 @@ export default function Chat({ person, messages, onSendMessage, onBack }: ChatPr
   };
 
   const clearAI = () => { setAiMessages([]); setText(""); };
+
+  useEffect(() => {
+    if (isAI) return;
+    let active = true;
+    const setup = async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId || !person.id) return;
+      try {
+        await ensureIdentity(userId);
+        if (!active) return;
+        setSecureReady(true);
+        const { data: mine } = await supabase.from("conversation_members").select("conversation_id").eq("user_id", userId);
+        const ids = (mine || []).map((row: any) => row.conversation_id);
+        let found: string | null = null;
+        if (ids.length) {
+          const { data: other } = await supabase.from("conversation_members").select("conversation_id,user_id").in("conversation_id", ids).eq("user_id", person.id);
+          found = other?.[0]?.conversation_id || null;
+        }
+        if (!found) {
+          const created = await supabase.from("conversations").insert({ created_by: userId }).select("id").single();
+          if (created.error || !created.data) throw created.error || new Error("Could not create conversation");
+          found = created.data.id;
+          const { error } = await supabase.from("conversation_members").insert([{ conversation_id: found, user_id: userId }, { conversation_id: found, user_id: person.id }]);
+          if (error) throw error;
+        }
+        if (!active) return;
+        setConversationId(found);
+      } catch (error: any) {
+        console.error(error);
+        setSecureError(error?.message || "Secure messaging could not be initialized.");
+      }
+    };
+    void setup();
+    return () => { active = false; };
+  }, [isAI, person.id]);
+
+  useEffect(() => {
+    if (isAI || !conversationId) return;
+    let active = true;
+    const loadEncryptedChat = async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) return;
+      const { data, error } = await supabase.from("messages").select("id,body,ciphertext,iv,encrypted_keys,sender_id,created_at").eq("conversation_id", conversationId).order("created_at", { ascending: true });
+      if (error) { setSecureError(error.message); return; }
+      const rows = (data || []) as DbMessage[];
+      const decrypted = await Promise.all(rows.map(async message => {
+        let content = "";
+        if (isEncryptedMessage(message)) {
+          try { content = await decryptMessage(userId, { ciphertext: message.ciphertext!, iv: message.iv!, encrypted_keys: message.encrypted_keys! }); }
+          catch { content = "🔒 Unable to decrypt this message on this device."; }
+        } else {
+          content = "🔒 Legacy message: this message was sent before end-to-end encryption was enabled.";
+        }
+        return { id: message.id, text: content, sender: message.sender_id === userId ? "me" as const : "them" as const, time: new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
+      }));
+      if (active) setChatMessages(decrypted);
+    };
+    void loadEncryptedChat();
+    const channel = supabase.channel(`freetext-e2ee-chat-${conversationId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` }, () => { void loadEncryptedChat(); }).subscribe();
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [isAI, conversationId]);
+
+  const clearChat = () => setChatMessages([]);
+
+  const sendSecureMessage = async () => {
+    const clean = text.trim();
+    if (!clean || chatBusy || !conversationId || !secureReady) return;
+    setText("");
+    setChatBusy(true);
+    setSecureError("");
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) throw new Error("You are not signed in.");
+      const encrypted = await encryptForConversation(userId, conversationId, clean);
+      const { error } = await supabase.from("messages").insert({ conversation_id: conversationId, sender_id: userId, body: null, ciphertext: encrypted.ciphertext, iv: encrypted.iv, encrypted_keys: encrypted.encrypted_keys, message_type: "text" });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error(error);
+      setSecureError(error?.message || "Message encryption failed. Your message was not sent.");
+      setText(clean);
+    } finally { setChatBusy(false); }
+  };
 
   const sendAI = async () => {
     const clean = text.trim();
@@ -63,17 +156,17 @@ export default function Chat({ person, messages, onSendMessage, onBack }: ChatPr
   };
 
   const send = () => {
-    const clean = text.trim();
-    if (!clean) return;
-    if (isAI) void sendAI(); else { onSendMessage(clean); setText(""); }
+    if (isAI) void sendAI();
+    else void sendSecureMessage();
   };
 
   const keyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
 
   if (!isAI) return <section className="chat-page"><div className="chat-card">
-    <header className="chat-header"><button className="chat-back" onClick={onBack} aria-label="Back"><ArrowLeft size={21}/></button><img src={person.avatar} alt={person.name} className="avatar" style={{width:42,height:42}}/><div className="chat-person"><strong>{person.name}</strong><span>@{person.username}</span></div></header>
-    <div className="chat-messages">{messages.length===0 ? <div className="empty-state">Start the conversation with {person.name}.</div> : messages.map(m => <div key={m.id} className={`message-row ${m.sender==='me'?'mine':''}`}><div className="message-bubble">{m.text}<small>{m.time}</small></div></div>)}</div>
-    <div className="chat-input"><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={keyDown} placeholder={`Message ${person.name}…`}/><button onClick={send} disabled={!text.trim()} aria-label="Send"><Send size={18}/></button></div>
+    <header className="chat-header"><button className="chat-back" onClick={onBack} aria-label="Back"><ArrowLeft size={21}/></button><img src={person.avatar} alt={person.name} className="avatar" style={{width:42,height:42}}/><div className="chat-person"><strong>{person.name}</strong><span><Lock size={11} style={{verticalAlign:"-2px",marginRight:4}}/>End-to-end encrypted</span></div></header>
+    <div className="chat-messages">{chatMessages.length===0 ? <div className="empty-state">{secureError || "Messages are protected with end-to-end encryption."}</div> : chatMessages.map(m => <div key={m.id} className={`message-row ${m.sender==='me'?'mine':''}`}><div className="message-bubble">{m.text}<small>{m.time}</small></div></div>)}</div>
+    {secureError && <div style={{padding:"6px 14px",fontSize:11,color:"#b91c1c"}}>{secureError}</div>}
+    <div className="chat-input"><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={keyDown} placeholder={secureReady ? `Message ${person.name} securely…` : "Setting up secure messaging…"} disabled={!secureReady||chatBusy}/><button onClick={send} disabled={!text.trim()||!secureReady||chatBusy} aria-label="Send"><Send size={18}/></button></div>
   </div></section>;
 
   return <section className="chat-page boi-ai-native-page">
