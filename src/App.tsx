@@ -31,10 +31,8 @@ function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const login = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
+    event.preventDefault(); setError("");
     if (!email.trim() || !password) { setError("Enter the administrator email and password."); return; }
     setLoading(true);
     const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -44,22 +42,17 @@ function AdminLogin() {
     if (roleError || !allowed) { await supabase.auth.signOut(); setError("This account is not authorized as a FreeText super administrator."); return; }
     window.location.reload();
   };
-
-  return <div className="auth-page">
-    <div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" />
-    <section className="auth-card">
-      <div className="auth-brand"><div className="auth-logo"><Shield size={28} /></div><span>FreeText Admin</span></div>
-      <h1 className="auth-heading">Administrator Login</h1><p className="auth-helper">Secure access to the FreeText administration center.</p>
-      <form className="auth-form" onSubmit={login}>
-        <div className="auth-input-wrap"><User size={18} /><input className="auth-input" type="email" autoComplete="username" placeholder="Administrator email" value={email} onChange={e => setEmail(e.target.value)} /></div>
-        <div className="auth-input-wrap"><Lock size={18} /><input className="auth-input" type="password" autoComplete="current-password" placeholder="Administrator password" value={password} onChange={e => setPassword(e.target.value)} /></div>
-        {error && <div className="auth-error">{error}</div>}
-        <button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Signing in securely..." : "Sign in to Admin Center"}</button>
-        <button className="auth-phone-button" type="button" onClick={() => window.location.assign("/">Back to FreeText</button>
-      </form>
-      <p className="auth-terms">Admin access is restricted to authorized FreeText super administrators.</p>
-    </section>
-  </div>;
+  return <div className="auth-page"><div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" /><section className="auth-card">
+    <div className="auth-brand"><div className="auth-logo"><Shield size={28} /></div><span>FreeText Admin</span></div>
+    <h1 className="auth-heading">Administrator Login</h1><p className="auth-helper">Secure access to the FreeText administration center.</p>
+    <form className="auth-form" onSubmit={login}>
+      <div className="auth-input-wrap"><User size={18} /><input className="auth-input" type="email" autoComplete="username" placeholder="Administrator email" value={email} onChange={e => setEmail(e.target.value)} /></div>
+      <div className="auth-input-wrap"><Lock size={18} /><input className="auth-input" type="password" autoComplete="current-password" placeholder="Administrator password" value={password} onChange={e => setPassword(e.target.value)} /></div>
+      {error && <div className="auth-error">{error}</div>}
+      <button className="auth-primary-button" type="submit" disabled={loading}>{loading ? "Signing in securely..." : "Sign in to Admin Center"}</button>
+      <button className="auth-phone-button" type="button" onClick={() => window.location.assign("/")}>Back to FreeText</button>
+    </form><p className="auth-terms">Admin access is restricted to authorized FreeText super administrators.</p>
+  </section></div>;
 }
 
 function App() {
@@ -94,23 +87,14 @@ function App() {
   useEffect(() => { let mounted = true; const load = async () => { const { data, error: e } = await supabase.auth.getSession(); if (!mounted) return; if (e) console.error(e); setSession(data.session); setAuthLoading(false); }; load(); const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => { if (mounted) { setSession(s); setAuthLoading(false); } }); return () => { mounted = false; subscription.unsubscribe(); }; }, []);
   useEffect(() => { const done = () => { localStorage.removeItem("freetext_pending_verification_email"); setVerificationGate(false); }; window.addEventListener("freetext-verification-complete", done); return () => window.removeEventListener("freetext-verification-complete", done); }, []);
   useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); localStorage.setItem("freetext_dark_mode", String(darkMode)); }, [darkMode]);
-  useEffect(() => {
-    const onPopState = () => {
-      if (window.location.pathname === "/ai") { setSelectedPerson(AI_PERSON); setPage("ai"); }
-      else if (window.location.pathname === "/") { setSelectedPerson(current => current?.id === AI_ID ? null : current); setPage(current => current === "ai" ? "home" : current); }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  useEffect(() => { const onPopState = () => { if (window.location.pathname === "/ai") { setSelectedPerson(AI_PERSON); setPage("ai"); } else if (window.location.pathname === "/") { setSelectedPerson(current => current?.id === AI_ID ? null : current); setPage(current => current === "ai" ? "home" : current); } }; window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
 
   const loadProfile = async () => { if (!session?.user?.id) { setProfile(null); return; } setProfileLoading(true); const { data, error: e } = await supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle(); if (e) console.error(e); setProfile(data); setProfileLoading(false); };
   useEffect(() => { loadProfile(); }, [session?.user?.id]);
-
   const loadPeople = async () => { if (!session?.user?.id) return; const { data, error: e } = await supabase.from("profiles").select("id,username,full_name,avatar_url,is_banned").neq("id", session.user.id).eq("is_banned", false).order("created_at", { ascending: false }).limit(100); if (e) { console.error(e); return; } setPeople((data || []).map((p: any) => ({ id: p.id, name: p.full_name || p.username || "FreeText user", username: p.username || p.id.slice(0, 8), avatar: p.avatar_url || "https://i.pravatar.cc/150?u=" + p.id })) as Conversation[]); const { data: follows, error: followsError } = await supabase.from("follows").select("following_id").eq("follower_id", session.user.id); if (followsError) console.error(followsError); setFollowingIds((follows || []).map((f: any) => f.following_id)); };
   const loadPosts = async () => { if (!session?.user?.id) return; const { data, error: e } = await supabase.from("posts").select("id,author_id,caption,image_url,created_at,profiles(full_name,username,avatar_url)").order("created_at", { ascending: false }).limit(100); if (e) { setError(e.message); return; } const ids = (data || []).map((p: any) => p.id); const { data: likes } = ids.length ? await supabase.from("post_likes").select("post_id,user_id").in("post_id", ids) : { data: [] as any[] }; const { data: comments } = ids.length ? await supabase.from("comments").select("post_id").in("post_id", ids) : { data: [] as any[] }; const commentCounts = new Map<string, number>(); (comments || []).forEach((comment: any) => commentCounts.set(comment.post_id, (commentCounts.get(comment.post_id) || 0) + 1)); const likedSet = new Set((likes || []).filter((l: any) => l.user_id === session.user.id).map((l: any) => l.post_id)); const counts = new Map<string, number>(); (likes || []).forEach((l: any) => counts.set(l.post_id, (counts.get(l.post_id) || 0) + 1)); setPosts((data || []).map((p: DbPost) => ({ id: p.id, name: p.profiles?.full_name || p.profiles?.username || "FreeText user", username: p.profiles?.username || "user", avatar: p.profiles?.avatar_url || "https://i.pravatar.cc/150?u=" + p.author_id, image: p.image_url || "", caption: p.caption, likes: counts.get(p.id) || 0, comments: commentCounts.get(p.id) || 0, liked: likedSet.has(p.id), saved: JSON.parse(localStorage.getItem("freetext_saved") || "[]").includes(p.id), time: new Date(p.created_at).toLocaleString() }))); };
   const loadNotifications = async () => { if (!session?.user?.id) return; const { data } = await supabase.from("notifications").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(50); setNotifications(data || []); };
   const loadStories = async () => { if (!session?.user?.id) return; const { data, error: e } = await supabase.from("stories").select("id,author_id,media_url,media_type,expires_at,created_at,profiles(full_name,username,avatar_url)").gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(50); if (e) { console.error(e); return; } setStories((data || []).map((s: any) => ({ id: s.id, name: s.profiles?.full_name || s.profiles?.username || "FreeText user", username: s.profiles?.username || "user", avatar: s.profiles?.avatar_url || "https://i.pravatar.cc/150?u=" + s.author_id, mediaUrl: s.media_url, mediaType: s.media_type, createdAt: s.created_at, expiresAt: s.expires_at }))); };
-
   useEffect(() => { if (!session?.user?.id) { clearAiContext(); return; } syncAiContext({ profile, posts, notifications, stories, messages: chatMessages }); }, [session?.user?.id, profile, posts, notifications, stories, chatMessages]);
 
   const chooseStoryImage = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) { setError("Choose a story image smaller than 8MB."); return; } setStoryFile(file); setStoryImage(URL.createObjectURL(file)); };
