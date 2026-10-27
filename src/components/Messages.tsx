@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Bot, MessageCircle, Phone, Search, Video, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, Check, MessageCircle, Phone, Search, UserPlus, Video, X } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 type Person = { id: string; name: string; username: string; avatar: string };
 export type Conversation = Person & { lastMessage?: string; lastTime?: string; unread?: number; online?: boolean };
@@ -9,17 +10,33 @@ const AI_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 
 export default function Messages({ people = [], onOpenChat, onCall }: MessagesProps) {
   const [search, setSearch] = useState("");
+  const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [followBusy, setFollowBusy] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const aiContact: Conversation = { id: AI_ID, name: "Boi Achiver AI", username: AI_ID, avatar: AI_AVATAR, lastMessage: "Your personal FreeText assistant", online: true };
-  const allPeople = [aiContact, ...people.filter(person => person.id !== AI_ID)];
+  const aiContact: Conversation = { id: AI_ID, name: "Boi Achiever AI", username: AI_ID, avatar: AI_AVATAR, lastMessage: "Your personal FreeText assistant", online: true };
+  const realPeople = useMemo(() => people.filter(person => person.id !== AI_ID), [people]);
+  const allPeople = [aiContact, ...realPeople];
   const filteredPeople = allPeople.filter(person => `${person.name} ${person.username}`.toLowerCase().includes(search.toLowerCase()));
+  const suggestions = useMemo(() => realPeople.filter(person => !following.has(person.id)).slice(0, 8), [realPeople, following]);
+
+  useEffect(() => {
+    let active = true;
+    const loadFollowing = async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user || !active) return;
+      const { data } = await supabase.from("follows").select("following_id").eq("follower_id", auth.user.id);
+      if (active) setFollowing(new Set((data || []).map((row: any) => row.following_id)));
+    };
+    loadFollowing();
+    return () => { active = false; };
+  }, [people]);
 
   useEffect(() => {
     const raw = localStorage.getItem("freetext_pending_chat");
     if (!raw) return;
     try {
       const pending = JSON.parse(raw) as { username?: string };
-      const match = people.find(person => person.username === pending.username);
+      const match = people.find(person => person.username.toLowerCase() === String(pending.username || "").toLowerCase());
       if (match) {
         localStorage.removeItem("freetext_pending_chat");
         onOpenChat(match);
@@ -29,13 +46,34 @@ export default function Messages({ people = [], onOpenChat, onCall }: MessagesPr
     }
   }, [people, onOpenChat]);
 
+  const connect = async (person: Person) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user || auth.user.id === person.id || followBusy) return;
+    setFollowBusy(person.id);
+    const { error } = await supabase.from("follows").upsert({ follower_id: auth.user.id, following_id: person.id }, { onConflict: "follower_id,following_id" });
+    if (!error) setFollowing(prev => new Set(prev).add(person.id));
+    else console.error("Unable to connect with user:", error);
+    setFollowBusy(null);
+  };
+
   const startNewMessage = () => searchRef.current?.focus();
   const clearSearch = () => setSearch("");
 
   return <section className="page-section">
     <div className="messages-whatsapp">
-      <div className="messages-top"><div><h1>Messages</h1><p>Your conversations</p></div><button className="new-message-button" aria-label="New message" onClick={startNewMessage}><MessageCircle size={21} /></button></div>
-      <div className="message-search whatsapp-search"><Search size={18} /><input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search or start new chat" aria-label="Search conversations" />{search && <button type="button" className="search-clear" aria-label="Clear search" onClick={clearSearch}><X size={15} /></button>}</div>
+      <div className="messages-top"><div><h1>Messages</h1><p>Find people and stay connected</p></div><button className="new-message-button" aria-label="New message" onClick={startNewMessage}><MessageCircle size={21} /></button></div>
+      <div className="message-search whatsapp-search"><Search size={18} /><input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people or username" aria-label="Search people" />{search && <button type="button" className="search-clear" aria-label="Clear search" onClick={clearSearch}><X size={15} /></button>}</div>
+
+      {!search && suggestions.length > 0 && <div className="people-you-may-know">
+        <div className="people-section-heading"><div><h2>People you may know</h2><p>Connect with people already on FreeText</p></div><UserPlus size={20} /></div>
+        <div className="people-suggestions">
+          {suggestions.map(person => <div className="people-suggestion-card" key={person.id}>
+            <button className="people-person-button" onClick={() => onOpenChat(person)} aria-label={`Open ${person.name}'s profile`}><img src={person.avatar} alt={person.name} className="avatar" /><span><strong>{person.name}</strong><small>@{person.username}</small></span></button>
+            <button className="connect-button" onClick={() => connect(person)} disabled={followBusy === person.id} aria-label={`Connect with ${person.name}`}>{followBusy === person.id ? "..." : <><UserPlus size={15} /> Connect</>}</button>
+          </div>)}
+        </div>
+      </div>}
+
       <div className="conversation-list">
         {filteredPeople.length === 0 && <div className="no-conversations"><MessageCircle size={38} /><h3>No people found</h3><p>Try another name or username.</p></div>}
         {filteredPeople.map(person => { const isAI = person.id === AI_ID; return <div className={`conversation-row${isAI ? " boi-ai-row" : ""}`} key={person.username}><button className="conversation-main" onClick={() => onOpenChat(person)}><div className="conversation-avatar">{isAI ? <div className="boi-ai-avatar"><img src={person.avatar} alt="Boi Achiever AI" /></div> : <img src={person.avatar} alt={person.name} className="avatar" style={{ width: 58, height: 58 }} />}{person.online && <span className="online-dot" />}</div><div className="conversation-content"><div className="conversation-name"><strong>{person.name}</strong>{isAI && <span className="boi-ai-badge"><Bot size={12} /> AI</span>}{person.lastTime && <span className="conversation-time">{person.lastTime}</span>}</div><div className="conversation-preview"><span>{person.lastMessage || "Tap to start a conversation"}</span>{person.unread ? <b className="unread-badge">{person.unread}</b> : null}</div></div></button>{!isAI && <div className="conversation-actions"><button aria-label={`Audio call ${person.name}`} onClick={() => onCall?.(person, false)}><Phone size={18} /></button><button aria-label={`Video call ${person.name}`} onClick={() => onCall?.(person, true)}><Video size={19} /></button></div>}</div>; })}
