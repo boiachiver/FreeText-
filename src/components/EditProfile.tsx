@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, UserRound, AtSign, AlignLeft, X, Check, LoaderCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -12,10 +12,26 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
   const [cover, setCover] = useState(profile?.cover_url || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState("");
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const avatarFile = useRef<File | null>(null);
   const coverFile = useRef<File | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const clean = username.trim().replace(/^@/, "").replace(/\\s+/g, "").toLowerCase();
+    if (!clean || clean === (profile?.username || "").toLowerCase()) { setUsernameStatus(""); setCheckingUsername(false); return; }
+    if (!/^[a-z0-9._]{3,24}$/.test(clean)) { setUsernameStatus("Use 3–24 letters, numbers, dots or underscores."); setCheckingUsername(false); return; }
+    setCheckingUsername(true);
+    const timer = window.setTimeout(async () => {
+      const { data, error: checkError } = await supabase.from("profiles").select("id").eq("username", clean).neq("id", profile?.id || "").maybeSingle();
+      setCheckingUsername(false);
+      if (checkError) setUsernameStatus("We’ll check this when you save.");
+      else setUsernameStatus(data ? "That username is already taken." : "Username is available.");
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [username, profile?.id, profile?.username]);
 
   const chooseImage = (event: React.ChangeEvent<HTMLInputElement>, kind: "avatar" | "cover") => {
     const file = event.target.files?.[0];
@@ -74,7 +90,7 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
 
       <div className="easy-cover-wrap">
         {cover ? <img className="easy-cover-image" src={cover} alt="Cover preview" /> : <div className="easy-cover-placeholder"><ImagePlus size={25} /><span>Add a cover photo</span></div>}
-        <button type="button" className="easy-cover-action" onClick={() => coverInput.current?.click()}><Camera size={16} /> {cover ? "Change cover" : "Add cover"}</button>
+        <div className="easy-cover-actions"><button type="button" className="easy-cover-action" onClick={() => coverInput.current?.click()}><Camera size={16} /> {cover ? "Change cover" : "Add cover"}</button>{cover && <button type="button" className="easy-cover-remove" onClick={() => { coverFile.current = null; setCover(""); if (coverInput.current) coverInput.current.value = ""; }}>Remove</button>}</div>
         <input ref={coverInput} type="file" accept="image/*" hidden onChange={e => chooseImage(e, "cover")} />
       </div>
 
@@ -84,12 +100,12 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
           <i><Camera size={15} /></i>
         </button>
         <input ref={avatarInput} type="file" accept="image/*" hidden onChange={e => chooseImage(e, "avatar")} />
-        <div><strong>Your profile photo</strong><p>Choose a clear photo of yourself.</p><button type="button" className="easy-text-button" onClick={() => avatarInput.current?.click()}>Change photo</button></div>
+        <div className="easy-avatar-copy"><strong>Your profile photo</strong><p>Choose a clear photo of yourself.</p><div className="easy-photo-actions"><button type="button" className="easy-text-button" onClick={() => avatarInput.current?.click()}>Change photo</button>{avatar && <button type="button" className="easy-text-button easy-remove-text" onClick={() => { avatarFile.current = null; setAvatar(""); if (avatarInput.current) avatarInput.current.value = ""; }}>Remove</button>}</div></div>
       </div>
 
       <div className="easy-profile-fields">
         <label className="easy-field"><span><UserRound size={17} /> Your name</span><input autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your name" maxLength={80} /></label>
-        <label className="easy-field"><span><AtSign size={17} /> Username</span><div className="easy-username-input"><b>@</b><input autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ""))} placeholder="yourusername" maxLength={24} /></div><small>People can find you with this name. Letters, numbers, dots and underscores.</small></label>
+        <label className="easy-field"><span><AtSign size={17} /> Username</span><div className="easy-username-input"><b>@</b><input autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ""))} placeholder="yourusername" maxLength={24} /></div><small>People can find you with this name. Letters, numbers, dots and underscores.</small>{usernameStatus && <small className={usernameStatus.includes("available") ? "easy-username-good" : usernameStatus.includes("taken") || usernameStatus.startsWith("Use") ? "easy-username-bad" : ""}>{checkingUsername ? "Checking username…" : usernameStatus}</small>}</label>
         <label className="easy-field"><span><AlignLeft size={17} /> About you <em>Optional</em></span><textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Write a little about yourself..." rows={3} maxLength={160} /><small className="easy-bio-count">{bio.length}/160</small></label>
       </div>
 
@@ -98,7 +114,7 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
         <button type="button" className="easy-cancel-button" onClick={onCancel} disabled={busy}>Cancel</button>
         <button type="button" className="easy-save-button" onClick={save} disabled={busy}>{busy ? <><LoaderCircle size={18} className="easy-spin" /> Saving…</> : <><Check size={18} /> Save profile</>}</button>
       </div>
-      <p className="easy-profile-footnote">Your profile details can be changed again anytime.</p>
+      <p className="easy-profile-footnote">Your profile details can be changed again anytime. Photos should be under 8MB.</p>
     </section>
   </div>;
 }
