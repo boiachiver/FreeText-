@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Camera, X } from "lucide-react";
+import { Camera, ImagePlus, UserRound, AtSign, AlignLeft, X, Check, LoaderCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type EditProfileProps = { profile: any; onCancel: () => void; onSaved: (profile: any) => void };
@@ -14,13 +14,18 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
   const [error, setError] = useState("");
   const avatarFile = useRef<File | null>(null);
   const coverFile = useRef<File | null>(null);
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
 
   const chooseImage = (event: React.ChangeEvent<HTMLInputElement>, kind: "avatar" | "cover") => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Please choose an image file."); return; }
     if (file.size > 8 * 1024 * 1024) { setError("Choose an image smaller than 8MB."); return; }
-    if (kind === "avatar") { avatarFile.current = file; setAvatar(URL.createObjectURL(file)); }
-    else { coverFile.current = file; setCover(URL.createObjectURL(file)); }
+    setError("");
+    const preview = URL.createObjectURL(file);
+    if (kind === "avatar") { avatarFile.current = file; setAvatar(preview); }
+    else { coverFile.current = file; setCover(preview); }
   };
 
   const uploadImage = async (file: File | null, kind: string, current: string) => {
@@ -34,33 +39,66 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
 
   const save = async () => {
     setError("");
+    const cleanName = name.trim();
     const cleanUsername = username.trim().replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
-    if (!name.trim() || cleanUsername.length < 3) { setError("Enter your name and a username with at least 3 characters."); return; }
+    if (!cleanName) { setError("Please enter your name."); return; }
+    if (!/^[a-z0-9._]{3,24}$/.test(cleanUsername)) {
+      setError("Username must be 3–24 characters. Use letters, numbers, dots or underscores.");
+      return;
+    }
     if (!profile?.id) { setError("Your profile could not be loaded. Please sign in again."); return; }
     setBusy(true);
     try {
-      const avatarUrl = await uploadImage(avatarFile.current, "avatar", avatar);
-      const coverUrl = await uploadImage(coverFile.current, "cover", cover);
       const { data: existing, error: lookupError } = await supabase.from("profiles").select("id").eq("username", cleanUsername).neq("id", profile.id).maybeSingle();
       if (lookupError) throw lookupError;
-      if (existing) { setError("That username is already taken."); setBusy(false); return; }
-      const { data, error: updateError } = await supabase.from("profiles").update({ full_name: name.trim(), username: cleanUsername, bio: bio.trim(), avatar_url: avatarUrl, cover_url: coverUrl, updated_at: new Date().toISOString() }).eq("id", profile.id).select("*").single();
+      if (existing) { setError("That username is already taken. Try another one."); return; }
+      const avatarUrl = await uploadImage(avatarFile.current, "avatar", avatar);
+      const coverUrl = await uploadImage(coverFile.current, "cover", cover);
+      const { data, error: updateError } = await supabase.from("profiles").update({
+        full_name: cleanName, username: cleanUsername, bio: bio.trim(), avatar_url: avatarUrl,
+        cover_url: coverUrl, updated_at: new Date().toISOString()
+      }).eq("id", profile.id).select("*").single();
       if (updateError) throw updateError;
       onSaved(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your profile.");
+      setError(e instanceof Error ? e.message : "Could not save your profile. Please try again.");
     } finally { setBusy(false); }
   };
 
-  return <div className="modal-backdrop" onClick={onCancel}><div className="create-modal modern-edit-modal" onClick={e => e.stopPropagation()}>
-    <div className="modal-header"><h2>Edit Profile</h2><button onClick={onCancel} aria-label="Close"><X size={21} /></button></div>
-    <div className="edit-profile-preview"><img src={avatar || "https://i.pravatar.cc/150?u=freetext"} alt="Profile preview" className="avatar" /></div>
-    <label className="upload-options profile-photo-button"><Camera size={20} /> Change profile photo<input type="file" accept="image/*" onChange={e => chooseImage(e, "avatar")} hidden /></label>
-    <label className="profile-edit-label">Cover photo</label><input type="file" accept="image/*" onChange={e => chooseImage(e, "cover")} />
-    <label className="profile-edit-label">Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
-    <label className="profile-edit-label">Username</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" />
-    <label className="profile-edit-label">Bio</label><textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell people about yourself" rows={4} />
-    {error && <p className="auth-error" role="alert">{error}</p>}
-    <button className="publish-button modern-save-button" onClick={save} disabled={busy}>{busy ? "Saving..." : "Save Changes"}</button>
-  </div></div>;
+  return <div className="modal-backdrop edit-profile-backdrop" onClick={onCancel}>
+    <section className="create-modal easy-profile-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title" onClick={e => e.stopPropagation()}>
+      <header className="easy-profile-header">
+        <button className="easy-profile-close" onClick={onCancel} aria-label="Close edit profile"><X size={21} /></button>
+        <div><p className="easy-profile-eyebrow">MAKE IT YOURS</p><h2 id="edit-profile-title">Edit profile</h2><p className="easy-profile-subtitle">A few simple details help people recognize you.</p></div>
+      </header>
+
+      <div className="easy-cover-wrap">
+        {cover ? <img className="easy-cover-image" src={cover} alt="Cover preview" /> : <div className="easy-cover-placeholder"><ImagePlus size={25} /><span>Add a cover photo</span></div>}
+        <button type="button" className="easy-cover-action" onClick={() => coverInput.current?.click()}><Camera size={16} /> {cover ? "Change cover" : "Add cover"}</button>
+        <input ref={coverInput} type="file" accept="image/*" hidden onChange={e => chooseImage(e, "cover")} />
+      </div>
+
+      <div className="easy-avatar-row">
+        <button type="button" className="easy-avatar-picker" onClick={() => avatarInput.current?.click()} aria-label="Change profile photo">
+          {avatar ? <img src={avatar} alt="Profile preview" /> : <span><UserRound size={33} /></span>}
+          <i><Camera size={15} /></i>
+        </button>
+        <input ref={avatarInput} type="file" accept="image/*" hidden onChange={e => chooseImage(e, "avatar")} />
+        <div><strong>Your profile photo</strong><p>Choose a clear photo of yourself.</p><button type="button" className="easy-text-button" onClick={() => avatarInput.current?.click()}>Change photo</button></div>
+      </div>
+
+      <div className="easy-profile-fields">
+        <label className="easy-field"><span><UserRound size={17} /> Your name</span><input autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your name" maxLength={80} /></label>
+        <label className="easy-field"><span><AtSign size={17} /> Username</span><div className="easy-username-input"><b>@</b><input autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" value={username} onChange={e => setUsername(e.target.value.replace(/^@/, ""))} placeholder="yourusername" maxLength={24} /></div><small>People can find you with this name. Letters, numbers, dots and underscores.</small></label>
+        <label className="easy-field"><span><AlignLeft size={17} /> About you <em>Optional</em></span><textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Write a little about yourself..." rows={3} maxLength={160} /><small className="easy-bio-count">{bio.length}/160</small></label>
+      </div>
+
+      {error && <p className="easy-profile-error" role="alert">{error}</p>}
+      <div className="easy-profile-actions">
+        <button type="button" className="easy-cancel-button" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="button" className="easy-save-button" onClick={save} disabled={busy}>{busy ? <><LoaderCircle size={18} className="easy-spin" /> Saving…</> : <><Check size={18} /> Save profile</>}</button>
+      </div>
+      <p className="easy-profile-footnote">Your profile details can be changed again anytime.</p>
+    </section>
+  </div>;
 }
