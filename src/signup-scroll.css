@@ -1,0 +1,48 @@
+/* Signup page scrolling: keep the full Create Account form reachable on Android. */
+html:has(.auth-page),
+body:has(.auth-page),
+body:has(.auth-page) #root {
+  min-height: 100%;
+}
+
+html:has(.auth-page),
+body:has(.auth-page) {
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.auth-page {
+  min-height: 100svh !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain;
+  align-items: flex-start !important;
+  padding-top: 18px !important;
+  padding-bottom: max(110px, calc(32px + env(safe-area-inset-bottom))) !important;
+}
+
+.auth-page .auth-card {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin-bottom: 24px !important;
+}
+
+@media (max-width: 760px) {
+  .auth-page {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .auth-page .auth-card {
+    width: min(100%, 460px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
