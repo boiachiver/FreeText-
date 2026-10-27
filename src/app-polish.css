@@ -123,3 +123,17 @@ html:not(.dark) .easy-cancel-button{border-color:#d9dee8}
 .easy-spin{animation:easy-profile-spin .9s linear infinite}
 @keyframes easy-profile-spin{to{transform:rotate(360deg)}}
 @media(max-width:480px){.edit-profile-backdrop{padding:8px 8px 90px}.easy-profile-modal{border-radius:20px}.easy-profile-header{padding:20px 18px 15px}.easy-profile-header h2{font-size:24px}.easy-cover-wrap{height:125px;margin:0 12px}.easy-avatar-row{padding:0 18px}.easy-profile-fields{padding:18px 18px 6px}.easy-profile-actions{padding:16px 18px 0}.easy-profile-footnote{margin-right:18px;margin-left:18px}}
+
+
+/* Extra clarity and controls for profile photos and username feedback */
+.easy-cover-actions{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:7px}
+.easy-cover-actions .easy-cover-action{position:static}
+.easy-cover-remove{padding:9px 10px;border:1px solid rgba(255,255,255,.25);border-radius:12px;background:rgba(12,15,23,.72);color:#fff;font-size:12px;font-weight:700}
+.easy-avatar-copy{min-width:0}
+.easy-photo-actions{display:flex;align-items:center;gap:14px}
+.easy-remove-text{color:#f28b96}
+.easy-username-good{color:#48d6a0!important}
+.easy-username-bad{color:#ff8f9a!important}
+.easy-field small.easy-username-good,.easy-field small.easy-username-bad{font-weight:650}
+.easy-cover-action:focus-visible,.easy-cover-remove:focus-visible,.easy-avatar-picker:focus-visible,.easy-profile-actions button:focus-visible,.easy-text-button:focus-visible{outline:3px solid #94a4ff;outline-offset:3px}
+@media(max-width:360px){.easy-avatar-row{gap:10px;padding:0 14px}.easy-avatar-picker{flex-basis:70px;width:70px;height:70px}.easy-profile-header{padding-right:60px}.easy-profile-actions{gap:8px}.easy-profile-actions button{font-size:13px}}
