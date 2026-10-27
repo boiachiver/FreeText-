@@ -1,0 +1,100 @@
+/* FreeText visual polish v2 — premium social-app finish */
+:root{--ft-accent:#6d5dfc;--ft-accent-2:#8b7cff;--ft-border:rgba(148,163,184,.16);--ft-shadow:0 18px 50px rgba(15,23,42,.08)}
+html.dark{--ft-border:rgba(255,255,255,.09);--ft-shadow:0 18px 50px rgba(0,0,0,.28)}
+
+*{-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{overflow-x:hidden}
+button,input,textarea{transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease,opacity .18s ease}
+button:disabled{cursor:not-allowed;opacity:.58}
+
+/* Soft app background and centered desktop feed */
+.app-shell{position:relative;isolation:isolate}
+.app-shell::before{content:"";position:fixed;inset:58px 0 auto;height:260px;z-index:-1;pointer-events:none;background:radial-gradient(circle at 50% 0,rgba(109,93,252,.12),transparent 62%)}
+html.dark .app-shell::before{background:radial-gradient(circle at 50% 0,rgba(109,93,252,.16),transparent 62%)}
+.main-content{animation:ft-page-in .28s ease both}
+
+/* Feed and cards */
+.feed,.page-section{animation:ft-page-in .28s ease both}
+.stories-card,.post-card,.profile-card,.messages-whatsapp,.menu-page,.settings-card{border:1px solid var(--ft-border);box-shadow:var(--ft-shadow);background:rgba(255,255,255,.88);backdrop-filter:blur(16px)}
+html.dark .stories-card,html.dark .post-card,html.dark .profile-card,html.dark .messages-whatsapp,html.dark .menu-page,html.dark .settings-card{background:rgba(24,25,27,.92)}
+.post-card{overflow:hidden}
+.post-card:hover{box-shadow:0 22px 60px rgba(15,23,42,.12)}
+html.dark .post-card:hover{box-shadow:0 22px 60px rgba(0,0,0,.34)}
+
+/* Stories feel like tappable social bubbles */
+.stories-card{overflow:hidden}
+.story-item,.story-card,.story-avatar{transition:transform .18s ease,filter .18s ease}
+.story-item:active,.story-card:active,.story-avatar:active{transform:scale(.96)}
+.stories-card img{object-fit:cover}
+
+/* Consistent interactive controls */
+.icon-button:hover,.profile-mini:hover,.new-message-button:hover,.conversation-actions button:hover{transform:translateY(-1px)}
+.modern-create,.auth-primary-button{box-shadow:0 8px 22px rgba(37,99,235,.22)}
+.modern-create:active,.auth-primary-button:active{transform:translateY(1px) scale(.98)}
+
+/* Search fields */
+.search-box:focus-within,.whatsapp-search:focus-within{box-shadow:0 0 0 3px rgba(109,93,252,.14);border-color:rgba(109,93,252,.42)}
+
+/* Messages */
+.messages-whatsapp{border-radius:20px}
+.messages-top{background:linear-gradient(180deg,rgba(255,255,255,.04),transparent)}
+.conversation-row{transition:background .18s ease,transform .18s ease}
+.conversation-row:active{transform:scale(.992)}
+.conversation-main{width:100%;text-align:left}
+.conversation-content{min-width:0}
+.conversation-preview span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.boi-ai-row{border:1px solid rgba(109,93,252,.2);margin-bottom:6px}
+.boi-ai-avatar{width:56px;height:56px;border-radius:50%;padding:2px;background:linear-gradient(135deg,#6d5dfc,#ec4899);box-shadow:0 0 0 3px rgba(109,93,252,.12)}
+.boi-ai-avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.boi-ai-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:3px 6px;border-radius:999px;background:rgba(109,93,252,.15);color:#a99cff;font-size:10px;font-weight:800}
+
+/* Chat */
+.chat-screen{border-radius:20px;overflow:hidden;box-shadow:var(--ft-shadow)}
+.chat-screen button:active{transform:scale(.94)}
+
+/* Menu */
+.menu-page{max-width:760px;margin:0 auto;padding:18px;border-radius:24px}
+.menu-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.menu-header h1{font-size:25px;letter-spacing:-.5px}
+.menu-back{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(148,163,184,.12);color:inherit;font-size:28px}
+.menu-profile-card{width:100%;display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:rgba(148,163,184,.08);color:inherit;text-align:left}
+.menu-profile-card:hover{background:rgba(109,93,252,.12)}
+.menu-profile-card span:nth-child(2){display:flex;flex:1;flex-direction:column;min-width:0}
+.menu-profile-card small{opacity:.62;margin-top:2px}
+.menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.menu-tile{min-height:88px;padding:14px;display:flex;align-items:center;gap:12px;border:1px solid var(--ft-border);border-radius:18px;background:rgba(148,163,184,.06);color:inherit;text-align:left;font-weight:700}
+.menu-tile:hover{transform:translateY(-2px);background:rgba(109,93,252,.1);border-color:rgba(109,93,252,.25)}
+.menu-tile-icon{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:rgba(109,93,252,.13);color:#9b8fff}
+.menu-settings-list{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.menu-settings-list button{width:100%;min-height:58px;padding:10px 12px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;border-radius:15px;background:rgba(148,163,184,.06);color:inherit;text-align:left}
+.menu-settings-list button:hover{background:rgba(109,93,252,.09)}
+.menu-settings-list span{display:flex;align-items:center;gap:10px;font-weight:650}
+.menu-settings-list small{opacity:.58}
+.menu-logout{width:100%;margin-top:14px;min-height:52px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:16px;background:rgba(239,68,68,.1);color:#ef6a6a;font-weight:800}
+.menu-logout:hover{background:rgba(239,68,68,.16)}
+
+/* Empty states and error banners */
+.no-conversations{padding:54px 18px;text-align:center;color:#9ca3af}
+.no-conversations svg{margin-bottom:10px;opacity:.65}
+.page-section[role="alert"]{margin-bottom:10px;border:1px solid rgba(239,68,68,.25);border-radius:14px;background:rgba(239,68,68,.08);color:#ef7777;padding:10px 12px;display:flex;align-items:center;gap:8px}
+.page-section[role="alert"] button{margin-left:auto;background:transparent;color:inherit}
+
+/* Bottom nav premium floating feel */
+.mobile-bottom-nav{margin:0 auto;max-width:760px;left:50%;right:auto;transform:translateX(-50%);width:100%;border-radius:20px 20px 0 0}
+.mobile-bottom-nav button.active{box-shadow:inset 0 0 0 1px rgba(109,93,252,.18)}
+
+/* Modal polish */
+.modal-backdrop{backdrop-filter:blur(10px);background:rgba(2,6,23,.62)!important}
+.modal-card,.modal-content{border:1px solid var(--ft-border);box-shadow:0 30px 90px rgba(0,0,0,.28);border-radius:22px}
+
+@keyframes ft-page-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(max-width:760px){
+  .app-shell::before{height:190px}
+  .menu-page{margin:0 8px;padding:14px;border-radius:20px}
+  .menu-grid{gap:8px}
+  .menu-tile{min-height:82px;padding:12px}
+  .post-card,.stories-card,.profile-card,.messages-whatsapp{box-shadow:none}
+  .mobile-bottom-nav{border-radius:18px 18px 0 0}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
