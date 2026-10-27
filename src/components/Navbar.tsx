@@ -16,6 +16,7 @@ type NavbarProps = {
   toggleDarkMode: () => void;
   openCreate: () => void;
   openNotifications: () => void;
+  openAI: () => void;
   openProfile: () => void;
   profileAvatar: string;
   logout: () => void;
@@ -25,16 +26,7 @@ function Avatar({ src, size = 36 }: { src: string; size?: number }) {
   return <img src={src} alt="Profile" className="avatar" style={{ width: size, height: size }} />;
 }
 
-function openMessagesInsideApp() {
-  const messageButton = document.querySelector<HTMLButtonElement>(".mobile-bottom-nav button:nth-child(4)");
-  if (messageButton) {
-    messageButton.click();
-    return;
-  }
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-export default function Navbar({ search, setSearch, darkMode, toggleDarkMode, openCreate, openNotifications, openProfile, profileAvatar, logout }: NavbarProps) {
+export default function Navbar({ search, setSearch, darkMode, toggleDarkMode, openCreate, openNotifications, openAI, openProfile, profileAvatar, logout }: NavbarProps) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
@@ -49,7 +41,7 @@ export default function Navbar({ search, setSearch, darkMode, toggleDarkMode, op
         </div>
 
         <div className="top-actions">
-          <button className="icon-button" onClick={openMessagesInsideApp} aria-label="Open Boi Achiver AI in Messages" title="Boi Achiver AI">
+          <button className="icon-button" onClick={openAI} aria-label="Open Boi Achiever AI" title="Boi Achiever AI">
             <Bot size={21} />
           </button>
           <button className="icon-button modern-create" onClick={openCreate} aria-label="Create post" title="Create post"><Plus size={21} /></button>
