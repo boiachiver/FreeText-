@@ -6,25 +6,10 @@
     <meta name="theme-color" content="#05060a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>FreeText — Connect, Share & Chat</title>
     <meta name="description" content="FreeText is a modern social platform for connecting with friends, sharing posts and stories, messaging, and using Boi Achiver AI." />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <meta name="google-site-verification" content="PDlH0WpCHYRh6MJdAIfc-Z5yNHQ07ySPgRlX_7Qlxuc" />
     <link rel="canonical" href="https://freetext-app.vercel.app/" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="FreeText" />
-    <meta property="og:title" content="FreeText — Connect, Share & Chat" />
-    <meta property="og:description" content="Connect with friends, share your world, message privately, and use Boi Achiver AI." />
-    <meta property="og:url" content="https://freetext-app.vercel.app/" />
-    <meta property="og:image" content="https://freetext-app.vercel.app/icons/icon-512.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="FreeText — Connect, Share & Chat" />
-    <meta name="twitter:description" content="A modern social experience with private messaging and Boi Achiver AI." />
-    <meta name="twitter:image" content="https://freetext-app.vercel.app/icons/icon-512.png" />
-
     <style>
       * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       html, body { margin: 0; min-height: 100%; background: #05060a; }
@@ -54,9 +39,6 @@
       .ft-dots b { width: 6px; height: 6px; border-radius: 50%; background: #818cf8; animation: ft-dot 1.2s infinite ease-in-out; }
       .ft-dots b:nth-child(2) { background: #c084fc; animation-delay: .15s; }
       .ft-dots b:nth-child(3) { background: #f472b6; animation-delay: .3s; }
-      #ft-continue { opacity: 0; transform: translateY(10px); pointer-events: none; margin-top: 34px; padding: 13px 25px; border: 0; border-radius: 16px; color: white; font: 700 13px inherit; background: linear-gradient(90deg,#4f46e5,#6366f1); box-shadow: 0 16px 35px rgba(79,70,229,.28); cursor: pointer; transition: opacity .4s ease, transform .4s ease, scale .2s ease; }
-      #ft-continue.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-      #ft-continue:active { scale: .97; }
       .ft-version { margin-top: 11px; color: #3f4653; font-size: 9px; }
       .ft-footer { position: absolute; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); z-index: 2; text-align: center; color: #3f4653; font-size: 10px; }
       .ft-footer strong { color: #6366f1; }
@@ -71,41 +53,36 @@
   </head>
   <body>
     <div id="root"></div>
-
     <div id="freetext-splash" aria-label="FreeText loading screen">
       <div class="ft-blob one"></div><div class="ft-blob two"></div><div class="ft-blob three"></div>
       <main class="ft-center">
         <div class="ft-logo-wrap">
           <div class="ft-orbit"><span></span><span></span><span></span></div>
           <div class="ft-ring"></div>
-          <div class="ft-logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M13.2 2 4 13h6.2L8.8 22 20 9.1h-6.5L13.2 2Z"/></svg>
-          </div>
+          <div class="ft-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.2 2 4 13h6.2L8.8 22 20 9.1h-6.5L13.2 2Z"/></svg></div>
         </div>
         <h1 class="ft-title">FreeText</h1>
         <p class="ft-tagline">Chat · Status · Calls · AI</p>
         <div class="ft-progress"><i></i></div>
         <div class="ft-status"><span>Initializing FreeText</span><span class="ft-dots"><b></b><b></b><b></b></span></div>
-        <button id="ft-continue" type="button">Continue to FreeText <span aria-hidden="true">→</span></button>
         <div class="ft-version">Your social world · v3.2</div>
       </main>
       <footer class="ft-footer">Made with <strong>⚡</strong> by Boi Achiver</footer>
     </div>
-
     <script>
       (function () {
         const splash = document.getElementById('freetext-splash');
-        const button = document.getElementById('ft-continue');
-        const reveal = () => button.classList.add('show');
-        setTimeout(reveal, 2500);
-        setTimeout(reveal, 4500);
-        button.addEventListener('click', () => {
+        const enterFreeText = () => {
+          if (!splash || splash.classList.contains('is-hidden')) return;
           splash.classList.add('is-hidden');
           setTimeout(() => { splash.style.display = 'none'; }, 700);
-        });
+        };
+        // Automatically enter FreeText after the splash finishes. No button is required.
+        setTimeout(enterFreeText, 2500);
+        // Safety fallback if the main timer is interrupted.
+        setTimeout(enterFreeText, 4500);
       })();
     </script>
-
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
