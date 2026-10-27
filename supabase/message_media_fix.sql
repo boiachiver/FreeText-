@@ -4,10 +4,6 @@
 
 begin;
 
--- ============================================================
--- 1. MESSAGE COLUMNS USED BY THE REAL CHAT CLIENT
--- ============================================================
-
 alter table public.messages
   alter column body drop not null;
 
@@ -20,7 +16,6 @@ alter table public.messages
   add column if not exists attachment_mime text,
   add column if not exists attachment_size bigint;
 
--- Keep message types compatible with the chat client.
 alter table public.messages drop constraint if exists messages_message_type_check;
 alter table public.messages
   add constraint messages_message_type_check
@@ -30,57 +25,31 @@ create index if not exists messages_attachment_idx
   on public.messages(conversation_id, created_at)
   where attachment_path is not null;
 
--- ============================================================
--- 2. PRIVATE MESSAGE-MEDIA BUCKET
--- ============================================================
-
 insert into storage.buckets (
-  id,
-  name,
-  public,
-  file_size_limit,
-  allowed_mime_types
+  id, name, public, file_size_limit, allowed_mime_types
 )
 values (
-  'message-media',
-  'message-media',
-  false,
-  52428800,
+  'message-media', 'message-media', false, 52428800,
   array[
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'video/mp4',
-    'video/webm',
-    'video/quicktime'
+    'image/jpeg','image/png','image/webp','image/gif',
+    'video/mp4','video/webm','video/quicktime'
   ]
 )
 on conflict (id) do update
 set public = false,
     file_size_limit = 52428800,
     allowed_mime_types = array[
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'image/gif',
-      'video/mp4',
-      'video/webm',
-      'video/quicktime'
+      'image/jpeg','image/png','image/webp','image/gif',
+      'video/mp4','video/webm','video/quicktime'
     ];
-
--- ============================================================
--- 3. SECURE STORAGE POLICIES
--- Path format created by FreeText:
--- message-media/<sender_user_id>/<conversation_id>/<message_id>-<filename>
--- ============================================================
 
 drop policy if exists "message media upload" on storage.objects;
 drop policy if exists "message media read" on storage.objects;
 drop policy if exists "message media update" on storage.objects;
 drop policy if exists "message media delete" on storage.objects;
 
-after insert;
+-- Path format:
+-- message-media/<sender_user_id>/<conversation_id>/<message_id>-<filename>
 
 create policy "message media upload"
 on storage.objects
@@ -134,5 +103,4 @@ using (
 );
 
 commit;
-
 notify pgrst, 'reload schema';
