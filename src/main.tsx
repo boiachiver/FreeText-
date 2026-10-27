@@ -4,6 +4,7 @@ import App from "./App";
 import "./index.css";
 import "./app-polish.css";
 import "./polish-v2.css";
+import "./signup-scroll.css";
 
 // FreeText is designed dark-first on mobile. Respect an existing user choice,
 // but make the first visit match the production mobile experience.
