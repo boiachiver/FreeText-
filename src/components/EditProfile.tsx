@@ -20,7 +20,7 @@ export default function EditProfile({ profile, onCancel, onSaved }: EditProfileP
   const coverInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const clean = username.trim().replace(/^@/, "").replace(/\\s+/g, "").toLowerCase();
+    const clean = username.trim().replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
     if (!clean || clean === (profile?.username || "").toLowerCase()) { setUsernameStatus(""); setCheckingUsername(false); return; }
     if (!/^[a-z0-9._]{3,24}$/.test(clean)) { setUsernameStatus("Use 3–24 letters, numbers, dots or underscores."); setCheckingUsername(false); return; }
     setCheckingUsername(true);
