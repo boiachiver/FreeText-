@@ -1,2 +1,2 @@
-export { default } from "./MessagesProduction";
+export { default } from "./PresenceAwareMessages";
 export type { Conversation } from "./MessagesProduction";
