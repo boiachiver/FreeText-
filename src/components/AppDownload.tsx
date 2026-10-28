@@ -24,7 +24,7 @@ export default function AppDownload() {
     <div className="download-options">
       <article><div><Smartphone size={22} /></div><h2>Android</h2><p>Install FreeText from the website as an app. No separate account is needed.</p><button onClick={install}>Install on Android</button></article>
       <article><div><Share2 size={22} /></div><h2>iPhone</h2><p>Open FreeText in Safari, tap Share, then choose <strong>Add to Home Screen</strong>.</p><button onClick={install}>Show iPhone steps</button></article>
-      <article><div><MonitorDown size={22} /></div><h2>Web app</h2><p>Use FreeText directly from any modern browser with no download.</p><button onClick={() => window.location.assign("/">}>Open FreeText</button></article>
+      <article><div><MonitorDown size={22} /></div><h2>Web app</h2><p>Use FreeText directly from any modern browser with no download.</p><button onClick={() => window.location.assign("/")}>Open FreeText</button></article>
     </div>
     <p className="download-note">Native Google Play and Apple App Store packages can be published once the store developer accounts are connected. The website is prepared as an installable PWA now.</p>
   </section>;
