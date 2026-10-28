@@ -1,0 +1,13 @@
+{
+  "name": "FreeText Social",
+  "short_name": "FreeText",
+  "description": "FreeText social network for posts, stories, communities, messaging and calls.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#05060a",
+  "theme_color": "#05060a",
+  "categories": ["social", "communication"],
+  "icons": []
+}
