@@ -9,5 +9,5 @@
   "background_color": "#05060a",
   "theme_color": "#05060a",
   "categories": ["social", "communication"],
-  "icons": []
+  "icons": [{"src":"/freetext-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
